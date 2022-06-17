@@ -37,6 +37,8 @@ function bind(){
             if(element.checked) item.addClass('selectbox-item--checked')
         }
 
+        if(element.ghost) item.css('opacity',0.5)
+
         if(!element.noenter){
             var goclose = function(){
     
@@ -98,6 +100,7 @@ function toggle(){
         down: ()=>{
             Navigator.move('down')
         },
+        left: close,
         back: close
     })
     

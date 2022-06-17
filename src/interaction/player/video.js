@@ -6,6 +6,7 @@ import Platform from '../../utils/platform'
 import Arrays from '../../utils/arrays'
 import Storage from '../../utils/storage'
 import CustomSubs from './subs'
+import Normalization from './normalization'
 
 let listener = Subscribe()
 
@@ -25,6 +26,8 @@ let neeed_sacle
 let neeed_sacle_last
 let webos
 let hls
+let webos_wait = {}
+let normalization
 
 html.on('click',()=>{
     if(Storage.field('navigation_type') == 'mouse') playpause()
@@ -37,6 +40,73 @@ $(window).on('resize',()=>{
         scale()
     } 
 })
+
+/**
+ * Специально для вебось
+ */
+listener.follow('webos_subs',(data)=>{
+    webos_wait.subs = convertToArray(data.subs)
+})
+
+listener.follow('webos_tracks',(data)=>{
+    webos_wait.tracks = convertToArray(data.tracks)
+})
+
+/**
+ * Переключаем субтитры с предыдущей серии
+ */
+function webosLoadSubs(){
+    let subs = webos_wait.subs
+
+    video.webos_subs = subs
+    
+    let inx = params.sub + 1
+
+    if(typeof params.sub !== 'undefined' && subs[inx]){
+        subs.forEach(e=>{e.mode = 'disabled'; e.selected = false})
+
+        subs[inx].mode     = 'showing'
+        subs[inx].selected = true
+
+        console.log('WebOS','enable subs', inx)
+
+        subsview(true)
+    }
+    else if(Storage.field('subtitles_start')){
+        let full = subs.find(s=>(s.label || '').indexOf('олные') >= 0)
+
+        subs[0].selected = false
+         
+        if(full){
+            full.mode     = 'showing'
+            full.selected = true
+        }
+        else{
+            subs[1].mode     = 'showing'
+            subs[1].selected = true
+        }
+        
+        subsview(true)
+    }
+}
+
+/**
+ * Переключаем дорожки с предыдущей серии
+ */
+function webosLoadTracks(){
+    let tracks = webos_wait.tracks
+
+    video.webos_tracks = tracks
+
+    if(typeof params.track !== 'undefined' && tracks[params.track]){
+        tracks.forEach(e=>e.selected = false)
+
+        console.log('WebOS','enable tracks', params.track)
+
+        tracks[params.track].enabled  = true
+        tracks[params.track].selected = true
+    }
+}
 
 /**
  * Добовляем события к контейнеру
@@ -135,6 +205,7 @@ function bind(){
         })
     })
 
+    //получены первые данные
     video.addEventListener('loadedmetadata', function (e) {
         listener.send('videosize',{width: video.videoWidth, height: video.videoHeight})
 
@@ -162,6 +233,25 @@ function mutation(){
 
         last_mutation = Date.now()
     }
+}
+
+/**
+ * Конвертировать object to array
+ * @param {object[]} arr 
+ * @returns {array}
+ */
+function convertToArray(arr){
+    if(!Arrays.isArray(arr)){
+        let new_arr = []
+
+        for (let index = 0; index < arr.length; index++) {
+            new_arr.push(arr[index])
+        }
+
+        arr = new_arr
+    }
+
+    return arr
 }
 
 /**
@@ -245,36 +335,51 @@ function scale(){
     neeed_sacle = false
 }
 
+/**
+ * Сохранить текущие состояние дорожек и сабов
+ * @returns {{sub:integer, track:integer, level:integer}}
+ */
 function saveParams(){
-    let subs   = video.customSubs || video.textTracks || []
+    let subs   = video.customSubs || video.webos_subs || video.textTracks || []
     let tracks = []
 
     if(hls && hls.audioTracks && hls.audioTracks.length)   tracks = hls.audioTracks
     else if(video.audioTracks && video.audioTracks.length) tracks = video.audioTracks
 
-    if(webos && webos.sourceInfo) tracks = []
+    if(webos && webos.sourceInfo) tracks = video.webos_tracks || []
 
     if(tracks.length){
         for(let i = 0; i < tracks.length; i++){
-            if(tracks[i].enabled || tracks[i].selected) params.track = i
+            if(tracks[i].enabled == true || tracks[i].selected == true) params.track = i
         }
     }
 
     if(subs.length){
         for(let i = 0; i < subs.length; i++){
-            if(subs[i].enabled || subs[i].selected) params.sub = subs[i].index
+            if(subs[i].enabled == true || subs[i].selected == true){
+                params.sub = subs[i].index
+            } 
         }
     }
 
     if(hls && hls.levels) params.level = hls.currentLevel
 
+    console.log('WebOS','saved params', params)
+
     return params
 }
 
+/**
+ * Очисить состояние
+ */
 function clearParamas(){
     params = {}
 }
 
+/**
+ * Загрузитьновое состояние из прошлого
+ * @param {{sub:integer, track:integer, level:integer}} saved_params 
+ */
 function setParams(saved_params){
     params = saved_params
 }
@@ -285,6 +390,10 @@ function setParams(saved_params){
 function loaded(){
     let tracks = []
     let subs   = video.customSubs || video.textTracks || []
+
+    console.log('WebOS','video full loaded')
+
+    if(hls) console.log('Player','hls test', hls.audioTracks.length)
 
     if(hls && hls.audioTracks && hls.audioTracks.length){
         tracks = hls.audioTracks
@@ -302,42 +411,35 @@ function loaded(){
     }   
 	else if(video.audioTracks && video.audioTracks.length) tracks = video.audioTracks
 
-    if(webos && webos.sourceInfo) tracks = []
+    console.log('Player','tracks', video.audioTracks)
+
+    if(webos && webos.sourceInfo){
+        tracks = []
+
+        if(webos_wait.tracks) webosLoadTracks()
+        if(webos_wait.subs)   webosLoadSubs()
+    } 
 
     if(tracks.length){
-        if(!Arrays.isArray(tracks)){
-            let new_tracks = []
-
-            for (let index = 0; index < tracks.length; index++) {
-                new_tracks.push(tracks[index])
-            }
-
-            tracks = new_tracks
-        }
+        tracks = convertToArray(tracks)
 
         if(typeof params.track !== 'undefined' && tracks[params.track]){
-            tracks.forEach(e=>e.selected = false)
+            tracks.forEach(e=>{e.selected = false})
 
             tracks[params.track].enabled = true
             tracks[params.track].selected = true
+
+            console.log('WebOS','enable track by default')
         }
 
         listener.send('tracks', {tracks: tracks})
     }
 
     if(subs.length){
-        if(!Arrays.isArray(subs)){
-            let new_subs = []
-
-            for (let index = 0; index < subs.length; index++) {
-                new_subs.push(subs[index])
-            }
-
-            subs = new_subs
-        }
-
+        subs = convertToArray(subs)
+        
         if(typeof params.sub !== 'undefined' && subs[params.sub]){
-            subs.forEach(e=>e.mode = 'disabled')
+            subs.forEach(e=>{e.mode = 'disabled'; e.selected = false})
 
             subs[params.sub].mode     = 'showing'
             subs[params.sub].selected = true
@@ -345,7 +447,7 @@ function loaded(){
             subsview(true)
         }
         else if(Storage.field('subtitles_start')){
-            let full = subs.find(s=>s.label.indexOf('олные') >= 0)
+            let full = subs.find(s=>(s.label || '').indexOf('олные') >= 0)
              
             if(full){
                 full.mode     = 'showing'
@@ -393,10 +495,12 @@ function loaded(){
 
         listener.send('levels', {levels: hls.levels, current: current_level})
     }
-
-    
 }
 
+/**
+ * Установить собственные субтитры
+ * @param {[{index:integer, label:string, url:string}]} subs 
+ */
 function customSubs(subs){
     video.customSubs = subs
 
@@ -432,7 +536,7 @@ function customSubs(subs){
 
 /**
  * Включить или выключить субтитры
- * @param {Boolean} status 
+ * @param {boolean} status 
  */
 function subsview(status){
     subtitles.toggleClass('hide', !status)
@@ -473,10 +577,17 @@ function create(){
         videobox = $('<video class="player-video__video" poster="./img/video_poster.png" crossorigin="anonymous"></video>')
 
         video = videobox[0]
+
+        if(Storage.field('player_normalization')){
+            console.log('Player','normalization enabled')
+    
+            normalization = new Normalization()
+            normalization.attach(video)
+        }
     }
 
     applySubsSettings()
-    
+
     display.append(videobox)
 
     if(Platform.is('webos') && !webos){
@@ -489,6 +600,8 @@ function create(){
 
             $(video).remove()
 
+            if(normalization) normalization.destroy()
+
             url(src)
 
             video.customSubs = sub
@@ -498,14 +611,18 @@ function create(){
             listener.send('reset_continue',{})
         }
         webos.start()
-    } 
+    }
 
     bind()
 }
 
+function normalizationVisible(status){
+    if(normalization) normalization.visible(status)
+}
+
 /**
  * Показать згразку или нет
- * @param {Boolean} status 
+ * @param {boolean} status 
  */
 function loader(status){
     wait = status
@@ -515,7 +632,7 @@ function loader(status){
 
 /**
  * Устанавливаем ссылку на видео
- * @param {String} src 
+ * @param {string} src 
  */
  function url(src){
     loader(true)
@@ -530,8 +647,7 @@ function loader(status){
     if(/.m3u8/.test(src) && typeof Hls !== 'undefined'){
         if(navigator.userAgent.toLowerCase().indexOf('maple') > -1) src += '|COMPONENT=HLS'
 
-        if(video.canPlayType('application/vnd.apple.mpegurl')) load(src)
-        else if (Hls.isSupported()) {
+        if (Hls.isSupported()) {
             try{
                 hls = new Hls()
                 hls.attachMedia(video)
@@ -558,6 +674,10 @@ function loader(status){
     else load(src)
 }
 
+/**
+ * Начать загрузку
+ * @param {string} src 
+ */
 function load(src){
     video.src = src
 
@@ -637,7 +757,7 @@ function playpause(){
 
 /**
  * Завершаем перемотку
- * @param {Boolean} immediately - завершить немедленно
+ * @param {boolean} immediately - завершить немедленно
  */
 function rewindEnd(immediately){
     clearTimeout(timer.rewind_call)
@@ -656,8 +776,8 @@ function rewindEnd(immediately){
 
 /**
  * Подготовка к перемотке
- * @param {Int} position_time - новое время
- * @param {Boolean} immediately - завершить немедленно
+ * @param {number} position_time - новое время
+ * @param {boolean} immediately - завершить немедленно
  */
 function rewindStart(position_time,immediately){
     if(!video.duration) return
@@ -679,8 +799,8 @@ function rewindStart(position_time,immediately){
 
 /**
  * Начать перематывать
- * @param {Boolean} forward - направление, true - вперед
- * @param {Int} custom_step - свое значение в секундах
+ * @param {boolean} forward - направление, true - вперед
+ * @param {number} custom_step - свое значение в секундах
  */
 function rewind(forward, custom_step){
     if(video.duration){
@@ -709,7 +829,7 @@ function rewind(forward, custom_step){
 
 /**
  * Размер видео, масштаб
- * @param {String} type 
+ * @param {string} type
  */
 function size(type){
     neeed_sacle = type
@@ -722,7 +842,7 @@ function size(type){
 
 /**
  * Перемотка на позицию 
- * @param {Float} type 
+ * @param {number} type 
  */
 function to(seconds){
     pause()
@@ -735,6 +855,7 @@ function to(seconds){
 
 /**
  * Уничтожить
+ * @param {boolean} type - сохранить с параметрами
  */
 function destroy(savemeta){
     subsview(false)
@@ -746,6 +867,7 @@ function destroy(savemeta){
     if(webos) webos.destroy()
 
     webos = null
+    webos_wait = {}
 
     if(hls){
         hls.destroy()
@@ -766,6 +888,11 @@ function destroy(savemeta){
 
             video.load()
         }
+    }
+
+    if(normalization){
+        normalization.destroy()
+        normalization = false
     }
 
     display.empty()
@@ -793,5 +920,6 @@ export default {
     video: ()=> { return video },
     saveParams,
     clearParamas,
-    setParams
+    setParams,
+    normalizationVisible
 }

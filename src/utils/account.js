@@ -301,6 +301,8 @@ function renderPanel(){
                 })
             })
 
+            body.find('.settings--account-user-backup').on('hover:enter',backup)
+
             profile()
         }
         else check()
@@ -478,6 +480,117 @@ function torrentPopular(data, secuses, error){
     network.silent(api + 'torrent/popular',secuses,error,data)
 }
 
+function backup(){
+    let account = Storage.get('account','{}')
+
+    if(account.token){
+        Select.show({
+            title: 'Бэкап',
+            items: [
+                {
+                    title: 'Экспорт',
+                    export: true,
+                    selected: true
+                },
+                {
+                    title: 'Импорт',
+                    import: true
+                },
+                {
+                    title: 'Отмена'
+                }
+            ],
+            onSelect: (a)=>{
+                if(a.export){
+                    Select.show({
+                        title: 'Вы уверены?',
+                        items: [
+                            {
+                                title: 'Потверждаю',
+                                export: true,
+                                selected: true
+                            },
+                            {
+                                title: 'Отмена'
+                            }
+                        ],
+                        onSelect: (a)=>{
+                            if(a.export){
+                                let file = new File([JSON.stringify(localStorage)], "backup.json", {
+                                    type: "text/plain",
+                                })
+
+                                var formData = new FormData($('<form></form>')[0])
+                                    formData.append("file", file, "backup.json")
+
+                                $.ajax({
+                                    url: api + 'users/backup/export',
+                                    type: 'POST',
+                                    data: formData,
+                                    async: true,
+                                    cache: false,
+                                    contentType: false,
+                                    enctype: 'multipart/form-data',
+                                    processData: false,
+                                    headers: {
+                                        token: account.token
+                                    },
+                                    success: function (j) {
+                                        if(j.secuses){
+                                            Noty.show('Экспорт успешно завершён')
+                                        } 
+                                    },
+                                    error: function(){
+                                        Noty.show('Ошибка при экспорте')
+                                    }
+                                })
+                            }
+
+                            Controller.toggle('settings_component')
+                        },
+                        onBack: ()=>{
+                            Controller.toggle('settings_component')
+                        }
+                    })
+                }
+                else if(a.import){
+                    network.silent(api + 'users/backup/import',(data)=>{
+                        
+                        if(data.data){
+                            let keys = Arrays.getKeys(data.data)
+
+                            for(let i in data.data){
+                                localStorage.setItem(i, data.data[i])
+                            }
+
+                            Noty.show('Импорт успешно завершён - импортировано ('+keys.length+') - перезагрузка через 5 сек.')
+
+                            setTimeout(()=>{
+                                window.location.reload()
+                            },5000)
+                        }
+                        else Noty.show('Нет данных')
+                    },()=>{
+                        Noty.show('Ошибка при импорте')
+                    },false,{
+                        headers: {
+                            token: account.token
+                        }
+                    })
+
+                    Controller.toggle('settings_component')
+                }
+                else{
+                    Controller.toggle('settings_component')
+                }
+            },
+            onBack: ()=>{
+                Controller.toggle('settings_component')
+            }
+        })
+    }
+}
+
 export default {
     init,
     working,
@@ -491,5 +604,6 @@ export default {
     torrentPopular,
     clear,
     update,
-    network
+    network,
+    backup
 }

@@ -259,6 +259,7 @@ function list(items, params){
             title: Utils.pathToNormalTitle(element.path),
             size: Utils.bytesToSize(element.length),
             url: Torserver.stream(element.path, SERVER.hash, element.id),
+            torrent_hash: SERVER.hash,
             timeline: view,
             air_date: '--',
             img: './img/img_broken.svg',

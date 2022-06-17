@@ -1,7 +1,7 @@
 function rezka(component, _object){
     let network    = new Lampa.Reguest()
     let extract    = {}
-    let embed      = 'https://voidboost.net/'
+    let embed      = component.proxy('rezka') + 'https://voidboost.net/'
     let object     = _object
 
     let select_title = ''

@@ -4,14 +4,15 @@ import Input from './input'
 import Platform from '../../utils/platform'
 import Select from '../../interaction/select'
 import Controller from '../../interaction/controller'
-import Modal from '../../interaction/modal'
 import Subscribe from '../../utils/subscribe'
 
 let values   = {}
 let defaults = {}
 let listener = Subscribe()
 
-
+/**
+ * Запуск
+ */
 function init(){
     if(Platform.is('tizen')){
         select('player',{
@@ -45,39 +46,40 @@ function init(){
 
 /**
  * Переключатель
- * @param {String} name - название
- * @param {Boolean} _default - значение по дефолту
+ * @param {string} name - название
+ * @param {boolean} value_default - значение по дефолту
  */
-function trigger(name,_default){
+function trigger(name,value_default){
     values[name] = {
         'true':'Да',
         'false':'Нет'
     }
 
-    defaults[name] = _default
+    defaults[name] = value_default
 }
 
 /**
  * Выбрать
- * @param {String} name - название
- * @param {*} _select - значение
- * @param {String} _default - значение по дефолту
+ * @param {string} name - название
+ * @param {{key:string}} select_data - значение
+ * @param {string} select_default_value - значение по дефолту
  */
-function select(name, _select, _default){
-    values[name] = _select
+function select(name, select_data, select_default_value){
+    values[name] = select_data
 
-    defaults[name] = _default
+    defaults[name] = select_default_value
 }
 
 /**
  * Биндит события на элемент
- * @param {*} elems 
+ * @param {object} elems 
  */
 function bind(elems){
     elems.on('hover:enter',(event)=>{
         let elem = $(event.target)
         let type = elem.data('type')
         let name = elem.data('name')
+        let onChange = elem.data('onChange')
 
         if(type == 'toggle'){
             let params   = values[name]
@@ -96,6 +98,8 @@ function bind(elems){
                 Storage.set(name,value)
 
                 update(elem)
+
+                if(onChange) onChange(value)
         }
 
         if(type == 'input'){
@@ -107,6 +111,8 @@ function bind(elems){
                 Storage.set(name,new_value)
 
                 update(elem)
+
+                if(onChange) onChange(new_value)
             })
         }
 
@@ -155,6 +161,8 @@ function bind(elems){
                     update(elem)
 
                     Controller.toggle(enabled)
+
+                    if(onChange) onChange(a.value)
                 }
             })
         }
@@ -167,6 +175,11 @@ function bind(elems){
     }
 }
 
+/**
+ * Добавить дополнительное полу
+ * @param {object} elem 
+ * @param {object} element 
+ */
 function displayAddItem(elem, element){
     let name  = elem.data('name')
     let item  = $('<div class="settings-param selector"><div class="settings-param__name">'+element+'</div>'+'</div>')
@@ -184,6 +197,10 @@ function displayAddItem(elem, element){
     elem.after(item)
 }
 
+/**
+ * Вывести дополнительные поля
+ * @param {object} elem 
+ */
 function displayAddList(elem){
     let list = Storage.get(elem.data('name'),'[]')
 
@@ -196,7 +213,7 @@ function displayAddList(elem){
 
 /**
  * Обновляет значения на элементе
- * @param {*} elem 
+ * @param {object} elem 
  */
 function update(elem){
     let name = elem.data('name')
@@ -212,7 +229,7 @@ function update(elem){
 
 /**
  * Получить значение параметра
- * @param {String} name 
+ * @param {string} name 
  * @returns *
  */
 function field(name){
@@ -362,12 +379,12 @@ select('video_quality_default',{
 
 
 /**
- * Добовляем тригеры
+ * Добовляем триггеры
  */
 trigger('animation',true)
 trigger('background',true)
 trigger('torrserver_savedb',false)
-trigger('torrserver_preload', false);
+trigger('torrserver_preload', false)
 trigger('parser_use',false)
 trigger('cloud_use',false)
 trigger('account_use',false)
@@ -375,8 +392,8 @@ trigger('torrserver_auth',false)
 trigger('mask',true)
 trigger('playlist_next',true)
 trigger('internal_torrclient', true)
-trigger('subtitles_stroke', true);
-trigger('subtitles_backdrop', false);
+trigger('subtitles_stroke', true)
+trigger('subtitles_backdrop', false)
 trigger('screensaver', true)
 trigger('proxy_tmdb', true)
 trigger('proxy_other', true)
@@ -384,13 +401,15 @@ trigger('parse_in_search', false)
 trigger('subtitles_start', false)
 trigger('helper', true)
 trigger('light_version', false)
+trigger('player_normalization', false)
+
 
 
 
 /**
  * Добовляем поля
  */
-select('jackett_url','','jac.red')
+select('jackett_url','','')
 select('jackett_key','','')
 select('torrserver_url','','')
 select('torrserver_url_two','','')

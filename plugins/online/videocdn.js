@@ -21,7 +21,7 @@ function videocdn(component, _object){
 
         select_title = object.movie.title
 
-        let url  = 'http://cdn.svetacdn.in/api/'
+        let url  = component.proxy('videocdn') + 'http://cdn.svetacdn.in/api/'
         let itm  = data[0]
         let type = itm.iframe_src.split('/').slice(-2)[0]
 
@@ -139,6 +139,28 @@ function videocdn(component, _object){
         return url
     }
 
+    function extractItems(str, max_quality){
+        try{
+            let items = str.split(',').map(item=>{
+                return {
+                    quality: parseInt(item.match(/\[(\d+)p\]/)[1]),
+                    file: 'http:' + item.replace(/\[\d+p\]/,'').split(' or ')[0]
+                }
+            }).filter(item=>{
+                return item.quality <= max_quality
+            })
+
+            items.sort((a,b)=>{
+                return b.quality - a.quality
+            })
+
+            return items
+        }
+        catch(e){}
+
+        return []
+    }
+
     /**
      * Получить информацию о фильме
      * @param {Arrays} results 
@@ -177,7 +199,8 @@ function videocdn(component, _object){
 
                         extract[i] = {
                             json: Lampa.Arrays.decodeJson(text.value,{}),
-                            file: extractFile(json[i], max_quality)
+                            //file: extractFile(json[i], max_quality)
+                            items: extractItems(json[i], max_quality)
                         }
 
                         for(let a in extract[i].json){
@@ -187,10 +210,12 @@ function videocdn(component, _object){
                                 for(let f in elem.folder){
                                     let folder = elem.folder[f]
                                     
-                                    folder.file = extractFile(folder.file, max_quality)
+                                    //folder.file = extractFile(folder.file, max_quality)
+                                    folder.items = extractItems(folder.file, max_quality)
                                 }
                             }
-                            else elem.file = extractFile(elem.file, max_quality)
+                            //else elem.file = extractFile(elem.file, max_quality)
+                            else elem.items = extractItems(elem.file, max_quality)
                         }
                     }
                 }
@@ -209,6 +234,7 @@ function videocdn(component, _object){
         let translat = extract[element.translation]
         let id       = element.season+'_'+element.episode
         let file     = ''
+        let items    = []
         let quality  = false
 
         if(translat){
@@ -221,26 +247,30 @@ function videocdn(component, _object){
                             let folder = elem.folder[f]
 
                             if(folder.id == id){
-                                file = folder.file
+                                //file = folder.file
+                                items = folder.items
 
                                 break
                             } 
                         }
                     }
                     else if(elem.id == id){
-                        file = elem.file
+                        //file = elem.file
+                        items = elem.items
 
                         break
                     }
                 }
             }
             else{
-                file = translat.file
+                //file = translat.file
+                items = translat.items
             } 
         }
 
         max_quality = parseInt(max_quality)
 
+        /*
         if(file){
             let path = file.slice(0, file.lastIndexOf('/')) + '/'
 
@@ -259,6 +289,28 @@ function videocdn(component, _object){
             
             let preferably = Lampa.Storage.get('video_quality_default','1080') + 'p'
             
+            if(quality[preferably]) file = quality[preferably]
+        }
+        */
+
+        if(items && items.length){
+            quality = {}
+
+            let mass = [1080,720,480,360]
+                mass = mass.slice(mass.indexOf(max_quality))
+
+                mass.forEach((n)=>{
+                    let exes = items.find(a=>a.quality == n)
+
+                    if(exes){
+                        if(!file) file = exes.file
+
+                        quality[n + 'p'] = exes.file
+                    }
+                })
+
+            let preferably = Lampa.Storage.get('video_quality_default','1080') + 'p'
+        
             if(quality[preferably]) file = quality[preferably]
         }
 

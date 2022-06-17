@@ -202,6 +202,42 @@ body.no--animation .background canvas {
   transition: transform 0.2s, -webkit-transform 0.2s, -moz-transform 0.2s, -o-transform 0.2s;
 }
 
+.normalization {
+  position: absolute;
+  top: 50%;
+  left: 1.5em;
+  padding: 10px;
+  height: auto;
+  background-color: rgba(0, 0, 0, 0.3);
+  -webkit-border-radius: 0.3em;
+     -moz-border-radius: 0.3em;
+          border-radius: 0.3em;
+  z-index: 60;
+  opacity: 0;
+  -webkit-transform: translateY(-50%) translateX(-100%);
+     -moz-transform: translateY(-50%) translateX(-100%);
+      -ms-transform: translateY(-50%) translateX(-100%);
+       -o-transform: translateY(-50%) translateX(-100%);
+          transform: translateY(-50%) translateX(-100%);
+  -webkit-transition: all 0.1s;
+  -o-transition: all 0.1s;
+  -moz-transition: all 0.1s;
+  transition: all 0.1s;
+}
+.normalization--visible {
+  opacity: 1;
+  -webkit-transform: translateY(-50%) translateX(0);
+     -moz-transform: translateY(-50%) translateX(0);
+      -ms-transform: translateY(-50%) translateX(0);
+       -o-transform: translateY(-50%) translateX(0);
+          transform: translateY(-50%) translateX(0);
+}
+
+body.platform--browser .normalization {
+  -webkit-backdrop-filter: blur(5px);
+          backdrop-filter: blur(5px);
+}
+
 .wrap {
   display: -webkit-box;
   display: -webkit-flex;
@@ -349,6 +385,7 @@ body.platform--android .wrap__left {
   overflow: hidden;
   -o-text-overflow: ellipsis;
      text-overflow: ellipsis;
+  line-height: 1.2;
 }
 .head__action {
   width: 2.8em;
@@ -976,8 +1013,9 @@ body.settings--open .settings__content {
 }
 .card__title {
   font-size: 1.2em;
-  max-height: 3.1em;
+  max-height: 3.6em;
   overflow: hidden;
+  line-height: 1.2;
   -o-text-overflow: ".";
      text-overflow: ".";
   display: -webkit-box;
@@ -1272,6 +1310,9 @@ body.settings--open .settings__content {
 }
 .card-parser + .card-parser {
   margin-left: 2em;
+}
+.card-parser + .card-more {
+  width: 14.6em;
 }
 
 .card-watched {
@@ -1596,6 +1637,9 @@ body.settings--open .settings__content {
 .full-start__button > svg {
   width: 1.5em;
   height: 1.5em;
+  -webkit-flex-shrink: 0;
+      -ms-flex-negative: 0;
+          flex-shrink: 0;
 }
 .full-start__button > svg + span {
   margin-left: 0.75em;
@@ -2957,6 +3001,9 @@ body.platform--orsay .category-full:after {
     height: 50vh !important;
   }
 }
+.search__results .broadcast__text {
+  margin-top: 2.6em;
+}
 @media screen and (max-width: 767px) {
   .search {
     display: block;
@@ -3009,6 +3056,20 @@ body.platform--orsay .category-full:after {
   margin-top: 1em;
 }
 
+.search-history-empty {
+  font-size: 1.3em;
+  color: #747474;
+}
+
+.search-looking {
+  text-align: center;
+}
+.search-looking__text {
+  margin-top: 3.3em;
+  font-size: 1.3em;
+  color: #747474;
+}
+
 body.system--keyboard .search__history {
   height: 60vh;
 }
@@ -3018,6 +3079,7 @@ body.system--keyboard .search__history .scroll__content {
 body.system--keyboard .search__keypad {
   height: auto;
   padding-bottom: 2em;
+  margin-top: 0;
 }
 @media screen and (max-width: 767px) {
   body.system--keyboard .search__left {
@@ -4307,6 +4369,9 @@ body.system--keyboard .search__keypad {
 .simple-button > svg + span {
   margin-left: 1em;
 }
+.simple-button > span {
+  margin-top: -0.2em;
+}
 .simple-button.focus {
   background-color: #fff;
   color: #000;
@@ -4376,6 +4441,44 @@ body.system--keyboard .search__keypad {
 }
 .console__line.focus {
   background-color: rgba(255, 255, 255, 0.2);
+}
+.console__tabs .scroll__body {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: flex;
+}
+.console__tab {
+  font-size: 1.1em;
+  background-color: #3e3e3e;
+  padding: 0.6em;
+  -webkit-border-radius: 0.3em;
+     -moz-border-radius: 0.3em;
+          border-radius: 0.3em;
+  white-space: nowrap;
+}
+.console__tab + .console__tab {
+  margin-left: 1em;
+}
+.console__tab > span {
+  font-size: 0.7em;
+  background-color: #ddd3;
+  padding: 0.3em;
+  -webkit-border-radius: 0.3em;
+     -moz-border-radius: 0.3em;
+          border-radius: 0.3em;
+  text-align: center;
+  min-width: 1.8em;
+  display: inline-block;
+}
+.console__tab.focus {
+  background: #fff;
+  color: #000;
+}
+.console__time {
+  color: #7c7c7c;
+  font-weight: 300;
 }
 
 .time-line {
