@@ -47,9 +47,6 @@ function Source(video){
     //нижний порог
     analyser.min_db = 0
 
-    //уровень для бара
-    analyser.draw_db = 0
-
     //подключаем анализ
     source.connect(analyser)
 
@@ -84,20 +81,24 @@ function Source(video){
 
         rms = Math.sqrt(total / analyser.fftSize)
 
-        analyser.min_db = smooth(analyser.min_db, min, 20)
+        let db = toDb(rms)
+        let sm = Storage.get('player_normalization_smooth','medium')
+        let pw = Storage.get('player_normalization_power','hight')
 
-        let db  = toDb(rms)
-        let low = (-48) - analyser.min_db
+        if(min === -48) min = db
+        if(min === -48) min = -40
+
+        analyser.min_db = smooth(analyser.min_db, min, sm == 'hight' ? 45 : sm == 'medium' ? 25 : 10)
+
+        let low = ((-48) - analyser.min_db) * (pw == 'hight' ? 1 : pw == 'medium' ? 0.75 : 0.5)
 
         volume.gain.value = Math.max(0.0,Math.min(2, db / low))
-
-        analyser.draw_db = smooth(analyser.draw_db, volume.gain.value, 5)
         
         if(display){
             draw_context.clearRect(0, 0, draw_canvas.width, draw_canvas.height)
 
-            let down = Math.min(1, Math.max(0, 1 - analyser.draw_db))
-            let up   = Math.min(1, Math.max(0, analyser.draw_db - 1))
+            let down = Math.min(1, Math.max(0, 1 - volume.gain.value))
+            let up   = Math.min(1, Math.max(0, volume.gain.value - 1))
             let half = draw_canvas.height / 2
 
             draw_context.fillStyle = 'rgba(251,91,91,1)'
@@ -130,7 +131,11 @@ function Source(video){
 }
 
 function Normalization(params = {}){
-    if(!context) context = new AudioContext()
+    if(!context){
+        let classContext = window.AudioContext || window.webkitAudioContext
+
+        context = new classContext()
+    } 
 
     let source
 
@@ -143,7 +148,7 @@ function Normalization(params = {}){
     }
 
     this.destroy = ()=>{
-        source.destroy()
+        if(source) source.destroy()
 
         source = null
     }

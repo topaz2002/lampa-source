@@ -15,6 +15,19 @@ function init(){
         if(event.name == 'interface_size') update()
         if(event.name == 'animation' || event.name == 'mask') toggleClasses()
     })
+
+    let body = $('body')
+    let mouse_timer
+
+    $(window).on('mousemove',()=>{
+        clearTimeout(mouse_timer)
+
+        mouse_timer = setTimeout(()=>{
+            if(typeof nw !== 'undefined') body.toggleClass('no--cursor',true)
+        },3000)
+
+        body.toggleClass('no--cursor',false)
+    })
 }
 
 function size(){
@@ -35,7 +48,11 @@ function size(){
 function update(){
     size()
 
-    let left = $('.wrap__left')[0].getBoundingClientRect()
+    let wrap = $('.wrap__left')
+
+    if(!wrap.length) return
+
+    let left = wrap[0].getBoundingClientRect()
 
     $('.layer--width').css('width',window.innerWidth - (Storage.field('light_version') && window.innerWidth >= 767 ? left.width : 0))
 

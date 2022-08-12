@@ -10,10 +10,11 @@ import Torserver from '../interaction/torserver'
 import Torrent from '../interaction/torrent'
 import Select from '../interaction/select'
 import Utils from '../utils/math'
+import Lang from '../utils/lang'
 
 function component(object){
     let network = new Reguest()
-    let scroll  = new Scroll({mask:true,over:true})
+    let scroll  = new Scroll({mask:true,over:true,step: 250,end_ratio:2})
     let items   = []
     let html    = $('<div></div>')
     let body    = $('<div class="category-full"></div>')
@@ -47,13 +48,11 @@ function component(object){
 
             let offset = object.page - 1
 
-            this.append(torrents.slice(20 * offset,20 * offset + 20))
-
-            Controller.enable('content')
+            this.append(torrents.slice(20 * offset,20 * offset + 20), true)
         }
     }
 
-    this.append = function(data){
+    this.append = function(data, append){
         data.forEach(element => {
             element.title = element.title.replace('[LAMPA] ','')
 
@@ -68,9 +67,7 @@ function component(object){
 
                     Background.change(item_data.movie ? Utils.cardImgBackground(item_data.movie) : element.poster)
 
-                    let maxrow = Math.ceil(items.length / 7) - 1
-
-                    if(Math.ceil(items.indexOf(card) / 7) >= maxrow) this.next()
+                    if(scroll.isEnd()) this.next()
                 }
 
                 card.onEnter = (target, card_data)=>{
@@ -83,11 +80,11 @@ function component(object){
                     let enabled = Controller.enabled().name
 
                     Select.show({
-                        title: 'Действие',
+                        title: Lang.translate('title_action'),
                         items: [
                             {
-                                title: 'Удалить',
-                                subtitle: 'Торрент будет удален из вашего списка'
+                                title: Lang.translate('torrent_remove_title'),
+                                subtitle: Lang.translate('torrent_remove_descr')
                             }
                         ],
                         onBack: ()=>{
@@ -110,6 +107,8 @@ function component(object){
                 card.visible()
 
                 body.append(card.render())
+
+                if(append) Controller.collectionAppend(card.render())
 
             items.push(card)
         })

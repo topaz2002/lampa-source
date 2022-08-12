@@ -1,27 +1,32 @@
 let html = `<div class="about">
-    <div>Приложение полностью бесплатное и использует публичные ссылки для получения информации о видео, новинках, популярных фильмах и т.д. Вся доступная информация используется исключительно в познавательных целях, приложение не использует свои собственные серверы для распространения информации.</div>
+    <div>#{about_text}</div>
 
 
     <div class="about__contacts">
         <div>
-            <small>Наш канал</small><br>
+            <small>#{about_channel}</small><br>
             @lampa_channel
         </div>
 
         <div>
-            <small>Группа</small><br>
+            <small>#{about_group}</small><br>
             @lampa_group
         </div>
 
         <div>
-            <small>Версия</small><br>
-            1.4.1
+            <small>#{about_version}</small><br>
+            <span class="version_app"></span>
+        </div>
+
+        <div class="hide platform_android">
+            <small>#{about_version} Android</small><br>
+            <span class="version_android"></span>
         </div>
     </div>
 
     <div class="about__contacts">
         <div>
-            <small>Донат</small><br>
+            <small>#{about_donate}</small><br>
             www.boosty.to/lampatv
         </div>
     </div>

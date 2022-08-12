@@ -3,17 +3,22 @@ import Scroll from './scroll'
 import Controller from './controller'
 import Utils from '../utils/math'
 
-let html   = Template.get('selectbox')
-let scroll = new Scroll({mask:true,over:true})
+let html
+let scroll
 let active
 
-html.find('.selectbox__body').append(scroll.render())
+function init(){
+    html   = Template.get('selectbox')
+    scroll = new Scroll({mask:true,over:true})
 
-html.find('.selectbox__layer').on('click',()=>{
-    window.history.back()
-})
+    html.find('.selectbox__body').append(scroll.render())
 
-$('body').append(html)
+    html.find('.selectbox__layer').on('click',()=>{
+        window.history.back()
+    })
+
+    $('body').append(html)
+}
 
 function bind(){
     scroll.clear()
@@ -24,6 +29,12 @@ function bind(){
         if(element.hide) return
 
         element.title = Utils.capitalizeFirstLetter(element.title || '')
+
+        if(element.separator){
+            let item = $('<div class="settings-param-title"><span>'+element.title+'</span></div>')
+            
+            return scroll.append(item)
+        }
         
         let item = Template.get(element.template || 'selectbox_item', element)
 
@@ -122,6 +133,7 @@ function render(){
 }
 
 export default {
+    init,
     show,
     hide,
     close,

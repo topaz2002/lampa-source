@@ -7,6 +7,8 @@ import Modal from '../interaction/modal'
 import Scroll from '../interaction/scroll'
 import Storage from '../utils/storage'
 import Filter from '../interaction/content_filter'
+import Lang from '../utils/lang'
+import Platform from '../utils/platform'
 
 let html
 let last
@@ -76,7 +78,7 @@ function ready(){
         if(action == 'movie' || action == 'tv' || action == 'anime'){
             Activity.push({
                 url: action,
-                title: (action == 'movie' ? 'Фильмы' : action == 'anime' ? 'Аниме' : 'Сериалы') + ' - ' + Storage.field('source').toUpperCase(),
+                title: (action == 'movie' ? Lang.translate('menu_movies') : action == 'anime' ? Lang.translate('menu_anime') : Lang.translate('menu_tv')) + ' - ' + Storage.field('source').toUpperCase(),
                 component: 'category',
                 source: action == 'anime' ? 'cub' : Storage.field('source')
             })
@@ -85,7 +87,7 @@ function ready(){
         if(prepared(action,['main'])){
             Activity.push({
                 url: '',
-                title: 'Главная - ' + Storage.field('source').toUpperCase(),
+                title: Lang.translate('title_main') + ' - ' + Storage.field('source').toUpperCase(),
                 component: 'main',
                 source: Storage.field('source')
             })
@@ -94,9 +96,18 @@ function ready(){
         if(action == 'search')   Controller.toggle('search')
         if(action == 'settings') Controller.toggle('settings')
         if(action == 'about'){
+            let about = Template.get('about')
+
+            if(Platform.is('android')){
+                about.find('.platform_android').removeClass('hide')
+                about.find('.version_android').text(Platform.version('android'))
+            }
+
+            about.find('.version_app').text(Platform.version('app'))
+
             Modal.open({
-                title: 'О приложении',
-                html: Template.get('about'),
+                title: Lang.translate('title_about'),
+                html: about,
                 size: 'medium',
                 onBack: ()=>{
                     Modal.close()
@@ -109,7 +120,7 @@ function ready(){
         if(action == 'favorite'){
             Activity.push({
                 url: '',
-                title: type == 'book' ? 'Закладки' : type == 'like' ? 'Нравится' : type == 'history' ? 'История просмотров' : 'Позже',
+                title: type == 'book' ? Lang.translate('title_book') : type == 'like' ? Lang.translate('title_like') : type == 'history' ? Lang.translate('title_history') : Lang.translate('title_wath'),
                 component: 'favorite',
                 type: type,
                 page: 1
@@ -119,7 +130,7 @@ function ready(){
         if(prepared(action,['timetable'])){
             Activity.push({
                 url: '',
-                title: 'Расписание',
+                title: Lang.translate('title_timetable'),
                 component: 'timetable',
                 page: 1
             })
@@ -128,7 +139,7 @@ function ready(){
         if(prepared(action,['mytorrents'])){
             Activity.push({
                 url: '',
-                title: 'Мои торренты',
+                title: Lang.translate('title_mytorrents'),
                 component: 'mytorrents',
                 page: 1
             })
@@ -137,7 +148,7 @@ function ready(){
         if(prepared(action,['relise'])){
             Activity.push({
                 url: '',
-                title: 'Цифровые релизы',
+                title: Lang.translate('title_relises'),
                 component: 'relise',
                 page: 1
             })
@@ -149,14 +160,14 @@ function ready(){
 
         if(action == 'collections'){
             Select.show({
-                title: 'Подборки',
+                title: Lang.translate('title_collections'),
                 items: [
                     {
-                        title: 'Подборки на ivi',
+                        title: Lang.translate('title_collections_ivi'),
                         source: 'ivi'
                     },
                     {
-                        title: 'Подборки на okko',
+                        title: Lang.translate('title_collections_okko'),
                         source: 'okko'
                     }
                 ],
@@ -189,14 +200,14 @@ function catalog(){
         source: Storage.field('source')
     },(menu)=>{
         Select.show({
-            title: 'Каталог',
+            title: Lang.translate('title_catalog'),
             items: menu,
             onSelect: (a)=>{
                 let tmdb = (Storage.field('source') == 'tmdb' || Storage.field('source') == 'cub')
                 
                 Activity.push({
                     url: Storage.field('source') == 'tmdb' ? 'movie' : '',
-                    title: 'Каталог - ' + a.title + ' - ' + Storage.field('source').toUpperCase(),
+                    title: Lang.translate('title_catalog') + ' - ' + a.title + ' - ' + Storage.field('source').toUpperCase(),
                     component: tmdb ? 'category' : 'category_full',
                     genres: a.id,
                     id: a.id,

@@ -209,6 +209,9 @@
     &__subs{
         padding: 0.45em !important;
     }
+    &__settings{
+        padding: 0.35em !important;
+    }
 
     &__next-episode-name{
         align-self: center;
@@ -236,7 +239,8 @@
     background-color: rgba(0,0,0,0.6);
 }
 
-body.platform--browser{
+body.platform--browser,
+body.platform--nw{
     .player-panel{
         background-color: rgba(0,0,0,0.3);
         backdrop-filter: blur(5px);

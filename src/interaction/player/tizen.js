@@ -8,108 +8,10 @@ function AVPlay(call_video){
     let listener = Subscribe()
 
 	let change_scale_later
+	let change_speed_later
 
 	object.width(window.innerWidth)
 	object.height(window.innerHeight)
-
-	// для тестов
-	/*
-	let webapis = {
-		paused: true,
-		duration: 500 * 1000,
-		position: 0,
-		avplay: {
-			open: ()=>{
-	
-			},
-			close: ()=>{
-				clearInterval(webapis.timer)
-			},
-			play: ()=>{
-				webapis.paused = false
-			},
-			pause: ()=>{
-				webapis.paused = true
-			},
-			setDisplayRect: ()=>{
-	
-			},
-			setDisplayMethod: ()=>{
-	
-			},
-			seekTo: (t)=>{
-				webapis.position = t
-			},
-			getCurrentTime: ()=>{
-				return webapis.position
-			},
-			getDuration: ()=>{
-				return webapis.duration
-			},
-			getState: ()=>{
-				return webapis.paused ? 'PAUSED' : 'PLAYNING'
-			},
-			getTotalTrackInfo: ()=>{
-				return [
-					{
-						type: 'AUDIO',
-						index: 0,
-						extra_info: '{"language":"russion"}'
-					},
-					{
-						type: 'AUDIO',
-						index: 1,
-						extra_info: '{"language":"english"}'
-					},
-					{
-						type: 'TEXT',
-						index: 0,
-						extra_info: '{"track_lang":"rus"}'
-					},
-					{
-						type: 'TEXT',
-						index: 1,
-						extra_info: '{"track_lang":"eng"}'
-					}
-				]
-			},
-			getCurrentStreamInfo: ()=>{
-				return []
-			},
-			setListener: ()=>{
-	
-			},
-			prepareAsync: (call)=>{
-				setTimeout(call, 1000)
-	
-				webapis.timer = setInterval(()=>{
-					if(!webapis.paused) webapis.position += 100
-
-					if(webapis.position >= webapis.duration){
-						clearInterval(webapis.timer)
-
-						webapis.position = webapis.duration
-
-						listener.send('ended')
-					}
-
-					if(!webapis.paused){
-						listener.send('timeupdate')
-
-						let s = webapis.duration / 4,
-							t = 'Welcome to subtitles'
-
-						if(webapis.position > s * 3) t = 'That\'s all I wanted to say'
-						else if(webapis.position > s * 2) t = 'This is a super taizen player'
-						else if(webapis.position > s) t = 'I want to say a few words'
-
-						listener.send('subtitle',{text:  t })
-					}
-				},30)
-			}
-		}
-	}
-	*/
 
 	/**
 	 * Установить урл
@@ -354,6 +256,15 @@ function AVPlay(call_video){
 		}
 	}
 
+	function changeSpeed(speed){
+		try{
+			webapis.avplay.setSpeed(speed)
+		}
+		catch(e){
+			change_speed_later = speed;
+		}
+	}
+
 	/**
 	 * Всегда говорим да, мы можем играть
 	 */
@@ -400,6 +311,12 @@ function AVPlay(call_video){
 				change_scale_later = false
 
 				changeScale(change_scale_later)
+			}
+
+			if(change_speed_later){
+				change_speed_later = false
+
+				changeSpeed(change_speed_later)
 			}
 		},
 
@@ -464,6 +381,13 @@ function AVPlay(call_video){
 	 */
 	video.size = function(type){
 		changeScale(type)
+	}
+
+	/**
+	 * Установить скорость
+	 */
+	 video.speed = function(speed){
+		changeSpeed(speed)
 	}
 
 	/**

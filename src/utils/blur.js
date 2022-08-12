@@ -144,10 +144,11 @@ const mulTable = [
       canvas = document.getElementById(canvas);
     }
     if (!canvas || typeof canvas !== 'object' || !('getContext' in canvas)) {
-      throw new TypeError(
+      /*throw new TypeError(
         'Expecting canvas with `getContext` method ' +
               'in processCanvasRGB(A) calls!'
       );
+      */
     }
   
     const context = canvas.getContext('2d');
@@ -155,7 +156,7 @@ const mulTable = [
     try {
       return context.getImageData(topX, topY, width, height);
     } catch (e) {
-      throw new Error('unable to access image data: ' + e);
+      //throw new Error('unable to access image data: ' + e);
     }
   }
   
@@ -174,11 +175,16 @@ const mulTable = [
   
     let imageData = getImageDataFromCanvas(canvas, topX, topY, width, height);
   
-    imageData = processImageDataRGBA(
-      imageData, topX, topY, width, height, radius
-    );
-  
-    canvas.getContext('2d').putImageData(imageData, topX, topY);
+    if(imageData){
+      imageData = processImageDataRGBA(
+        imageData, topX, topY, width, height, radius
+      );
+        
+      try{
+        canvas.getContext('2d').putImageData(imageData, topX, topY);
+      }
+      catch(e){}
+    }
   }
   
   /**
@@ -191,7 +197,7 @@ const mulTable = [
    * @returns {ImageData}
    */
   function processImageDataRGBA (imageData, topX, topY, width, height, radius) {
-    const pixels = imageData.data;
+    const pixels = imageData ? imageData.data : [];
   
     const div = 2 * radius + 1;
     // const w4 = width << 2;
@@ -449,8 +455,10 @@ const mulTable = [
     imageData = processImageDataRGB(
       imageData, topX, topY, width, height, radius
     );
-  
+    try{
     canvas.getContext('2d').putImageData(imageData, topX, topY);
+    }
+    catch(e){}
   }
   
   /**
@@ -463,7 +471,7 @@ const mulTable = [
    * @returns {ImageData}
    */
   function processImageDataRGB (imageData, topX, topY, width, height, radius) {
-    const pixels = imageData.data;
+    const pixels = imageData ? imageData.data : [];
   
     const div = 2 * radius + 1;
     // const w4 = width << 2;

@@ -1,4 +1,5 @@
 import Storage from './storage'
+import Manifest from './manifest'
 
 function init(){
     if(typeof webOS !== 'undefined' && webOS.platform.tv === true){
@@ -20,6 +21,12 @@ function init(){
     }
     else if(navigator.userAgent.toLowerCase().indexOf("lampa_client") > -1){
         Storage.set('platform', 'android')
+    }
+    else if(typeof nw !== 'undefined') {
+        Storage.set('platform', 'nw')
+    }
+    else if(navigator.userAgent.toLowerCase().indexOf("netcast") > -1) {
+        Storage.set('platform', 'netcast')
     }
     else if(navigator.userAgent.toLowerCase().indexOf("windows nt") > -1) {
         Storage.set('platform', 'browser')
@@ -56,7 +63,7 @@ function is(need){
  * @returns Boolean
  */
 function any(){
-    return is('tizen') || is('webos') || is('android') ? true : false
+    return is('tizen') || is('webos') || is('android') || is('nw') || is('netcast') ? true : false
 }
 
 /**
@@ -64,7 +71,19 @@ function any(){
  * @returns Boolean
  */
 function tv(){
-    return is('tizen') || is('webos') || is('orsay') ? true : false
+    return is('tizen') || is('webos') || is('orsay') || is('netcast') ? true : false
+}
+
+function version(name){
+    if(name){
+        return Manifest.app_version
+    }
+    else if(name){
+        return AndroidJS.appVersion()
+    }
+    else{
+        return ''
+    }
 }
 
 export default {
@@ -72,5 +91,6 @@ export default {
     get,
     any,
     is,
-    tv
+    tv,
+    version
 }

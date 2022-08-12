@@ -10,6 +10,7 @@ import Utils from '../utils/math'
 import VideoQuality from '../utils/video_quality'
 import Timetable from '../utils/timetable'
 import Timeline from './timeline'
+import Lang from '../utils/lang'
 
 /**
  * Карточка
@@ -32,7 +33,7 @@ function Card(data, params = {}){
         this.card    = Template.get(params.isparser ? 'card_parser' : 'card',data)
         this.img     = this.card.find('img')[0] || {}
 
-        let quality = VideoQuality.get(data)
+        
 
         if(data.first_air_date){
             this.card.find('.card__view').append('<div class="card__type"></div>')
@@ -77,21 +78,9 @@ function Card(data, params = {}){
             this.card.find('.card__age').remove()
         }
 
-        if(data.check_new_episode && Account.working()){
-            let notices = Storage.get('account_notice',[]).filter(n=>n.card_id == data.id)
+        this.card.data('update',this.update.bind(this))
 
-            if(notices.length){
-                let notice = notices[0]
-
-                if(Utils.parseTime(notice.date).full == Utils.parseTime(Date.now()).full){
-                    this.card.find('.card__view').append('<div class="card__new-episode"><div>Новая серия</div></div>')
-                }
-            }
-        }
-
-        if(quality){
-            this.card.find('.card__view').append('<div class="card__quality"><div>'+quality+'</div></div>')
-        }
+        this.update()
     }
     
     /**
@@ -108,11 +97,42 @@ function Card(data, params = {}){
     }
 
     /**
-     * Доюавить иконку
+     * Добавить иконку
      * @param {string} name 
      */
     this.addicon = function(name){
         this.card.find('.card__icons-inner').append('<div class="card__icon icon--'+name+'"></div>')
+    }
+
+    /**
+     * Обносить состояние карточки
+     */
+    this.update = function(){
+        let quality = VideoQuality.get(data)
+
+        this.card.find('.card__quality,.card-watched,.card__new-episode').remove()
+
+        if(quality){
+            this.card.find('.card__view').append('<div class="card__quality"><div>'+quality+'</div></div>')
+        }
+
+        this.watched_checked = false
+
+        this.favorite()
+
+        if(Account.working()){
+            let notices = Storage.get('account_notice',[]).filter(n=>n.card_id == data.id)
+
+            if(notices.length){
+                let notice = notices[0]
+
+                if(Utils.parseTime(notice.date).full == Utils.parseTime(Date.now()).full && notice.method !== 'movie'){
+                    this.card.find('.card__view').append('<div class="card__new-episode"><div>'+Lang.translate('card_new_episode')+'</div></div>')
+                }
+            }
+        }
+
+        if(this.card.hasClass('focus')) this.watched()
     }
 
     /**
@@ -140,7 +160,7 @@ function Card(data, params = {}){
                 let wrap = Template.get('card_watched',{})
 
                 next.forEach(ep=>{
-                    let item = $('<div class="card-watched__item"><span>'+ep.episode_number+' - '+(ep.name || 'Без названия')+'</span></div>')
+                    let item = $('<div class="card-watched__item"><span>'+ep.episode_number+' - '+(ep.name || Lang.translate('noname'))+'</span></div>')
 
                     if(ep == viewed.ep) item.append(Timeline.render(viewed.view))
 
@@ -184,26 +204,26 @@ function Card(data, params = {}){
         let status  = Favorite.check(data)
 
         Select.show({
-            title: 'Действие',
+            title: Lang.translate('title_action'),
             items: [
                 {
-                    title: status.book ? 'Убрать из закладок' : 'В закладки',
-                    subtitle: 'Смотрите в меню (Закладки)',
+                    title: status.book ? Lang.translate('card_book_remove') : Lang.translate('card_book_add'),
+                    subtitle: Lang.translate('card_book_descr'),
                     where: 'book'
                 },
                 {
-                    title: status.like ? 'Убрать из понравившихся' : 'Нравится',
-                    subtitle: 'Смотрите в меню (Нравится)',
+                    title: status.like ? Lang.translate('card_like_remove') : Lang.translate('card_like_add'),
+                    subtitle: Lang.translate('card_like_descr'),
                     where: 'like'
                 },
                 {
-                    title: status.wath ? 'Убрать из ожидаемых' : 'Смотреть позже',
-                    subtitle: 'Смотрите в меню (Позже)',
+                    title: status.wath ? Lang.translate('card_wath_remove') : Lang.translate('card_wath_add'),
+                    subtitle: Lang.translate('card_wath_descr'),
                     where: 'wath'
                 },
                 {
-                    title: status.history ? 'Убрать из истории' : 'Добавить в историю',
-                    subtitle: 'Смотрите в меню (История)',
+                    title: status.history ? Lang.translate('card_history_remove') : Lang.translate('card_history_add'),
+                    subtitle: Lang.translate('card_history_descr'),
                     where: 'history'
                 }
             ],
@@ -228,12 +248,10 @@ function Card(data, params = {}){
     this.create = function(){
         this.build()
 
-        this.favorite()
-
-        this.card.on('hover:focus',(e)=>{
+        this.card.on('hover:focus',(e, is_mouse)=>{
             this.watched()
 
-            this.onFocus(e.target, data)
+            this.onFocus(e.target, data, is_mouse)
         }).on('hover:enter',(e)=>{
             this.onEnter(e.target, data)
         }).on('hover:long',(e)=>{

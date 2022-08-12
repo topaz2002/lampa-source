@@ -4,6 +4,7 @@ import Storage from './storage'
 import Base64 from './base64'
 import Noty from '../interaction/noty'
 import Android from '../utils/android'
+import Lang from './lang'
 
 function create(){
     let listener = Subscribe();
@@ -253,23 +254,23 @@ function create(){
         var msg = '';
 
         if (jqXHR.status === 0 && exception !== 'timeout') {
-            msg = 'Нет подключения к сети.';
+            msg = Lang.translate('network_noconnect')
         } else if (jqXHR.status == 404) {
-            msg = 'Запрошенная страница не найдена. [404]';
+            msg = Lang.translate('network_404')
         } else if (jqXHR.status == 401) {
-            msg = 'Авторизация не удалась';
+            msg = Lang.translate('network_401')
         } else if (jqXHR.status == 500) {
-            msg = 'Внутренняя ошибка сервера. [500]';
+            msg = Lang.translate('network_500')
         } else if (exception === 'parsererror') {
-            msg = 'Запрошенный синтаксический анализ JSON завершился неудачно.';
+            msg = Lang.translate('network_parsererror')
         } else if (exception === 'timeout') {
-            msg = 'Время запроса истекло.';
+            msg = Lang.translate('network_timeout');
         } else if (exception === 'abort') {
-            msg = 'Запрос был прерван.';
+            msg = Lang.translate('network_abort');
         } else if (exception === 'custom') {
             msg = jqXHR.responseText;
         } else {
-            msg = 'Неизвестная ошибка: ' + jqXHR.responseText;
+            msg = Lang.translate('network_error') + ': ' + jqXHR.responseText;
         }
 
         return msg;
@@ -281,6 +282,20 @@ function create(){
      * @param {Object} params 
      */
     function go(params){
+        var error = function(jqXHR, exception){
+            console.log('Request','error of '+params.url+' :', errorDecode(jqXHR, exception));
+
+            if(params.before_error) params.before_error(jqXHR, exception);
+
+            if(params.error) params.error(jqXHR, exception);
+
+            if(params.after_error) params.after_error(jqXHR, exception);
+
+            if(params.end) params.end();
+        }
+
+        if(typeof params.url !== 'string' || !params.url) return error({status: 404}, '')
+
         listener.send('go');
 
         last_reguest = params;
@@ -316,19 +331,8 @@ function create(){
 
                 secuses(data);
             },
-            error: (jqXHR, exception) => {
-                console.log('Request','error of '+params.url+' :', errorDecode(jqXHR, exception));
-
-                if(params.before_error) params.before_error(jqXHR, exception);
-
-                if(params.error) params.error(jqXHR, exception);
-
-                if(params.after_error) params.after_error(jqXHR, exception);
-
-                if(params.end) params.end();
-            },
+            error: error,
             beforeSend: (xhr) => {
-                
                 let use = Storage.field('torrserver_auth')
 				let srv = Storage.get(Storage.field('torrserver_use_link') == 'two' ? 'torrserver_url_two' : 'torrserver_url')
 

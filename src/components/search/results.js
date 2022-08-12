@@ -1,18 +1,13 @@
 import Subscribe from '../../utils/subscribe'
-import Scroll from '../../interaction/scroll'
 import Controller from '../../interaction/controller'
-import Api from '../../interaction/api'
 import Arrays from '../../utils/arrays'
 import Line from '../../interaction/items/line'
-import Activity from '../../interaction/activity'
-import Parser from '../../utils/api/parser'
-import Torrent from '../../interaction/torrent'
-import Modal from '../../interaction/modal'
-import Template from '../../interaction/template'
+import Lang from '../../utils/lang'
+import Storage from '../../utils/storage'
 
-function create(){
-    let scroll,
-        timer,
+function create(source){
+    let timer,
+        html = $('<div></div>'),
         items = [],
         active = 0,
         query
@@ -20,170 +15,102 @@ function create(){
     this.listener = Subscribe()
 
     this.create = function(){
-        scroll = new Scroll({over: true})
-
-        scroll.height()
-
-        scroll.render().on('mouseover touchstart',()=>{
-            if(Controller.enabled().name !== 'items_line') this.toggle()
-        })
-
         this.empty()
     }
 
     this.empty = function(){
-        scroll.clear()
-        scroll.reset()
-
-        scroll.append($('<div class="search-looking"><div class="search-looking__text">Начните вводить текст для поиска.</div></div>'))
+        html.empty().append($('<div class="search-looking"><div class="search-looking__text">'+Lang.translate(query ? 'search_nofound' : 'search_start_typing')+'</div></div>'))
     }
 
     this.loading = function(){
-        scroll.clear()
-        scroll.reset()
+        this.listener.send('start')
 
-        scroll.append($('<div><div class="broadcast__text">Идет поиск...</div><div class="broadcast__scan"><div></div></div></div>'))
+        html.empty().append($('<div><div class="broadcast__text">'+Lang.translate('search_searching')+'</div><div class="broadcast__scan"><div></div></div></div>'))
     }
 
-    this.search = function(value){
+    this.cancel = function(){
+        if(source.onCancel) source.onCancel()
+    }
+
+    this.search = function(value, immediately){
         clearTimeout(timer)
-
-        query = value
-
-        Api.clear()
 
         if(value.length >= 2){
             timer = setTimeout(()=>{
+                if(query == value) return
+
+                query = value
+
                 this.loading()
 
-                Api.search({query: encodeURIComponent(value)},(data)=>{
+                source.search({query: encodeURIComponent(value)},(data)=>{
                     this.clear()
 
-                    if((data.movie && data.movie.results.length) || (data.tv && data.tv.results.length) || (data.parser && data.parser.results.length)){
-                        scroll.clear()
+                    if(data.length > 0){
+                        html.empty()
 
-                        if(data.movie && data.movie.results.length)   this.build(data.movie,'movie')
-                        if(data.tv && data.tv.results.length)         this.build(data.tv,'tv')
-                        if(data.parser && data.parser.results.length) this.build(data.parser,'parser')
-
-                        let name = Controller.enabled().name
-
-                        if(name == 'items_line' || name == 'search_results') Controller.toggle('search_results')
+                        data.forEach(this.build.bind(this))
                     }
+
+                    this.listener.send('finded',{count: data.length})
                 })
-            },1000)
+            },immediately ? 10 : 2500)
         }
         else{
+            query = value
+
             this.clear()
         }
     }
 
-    this.build = function(data, type){
+    this.build = function(data){
         data.noimage = true
-        
-        let params = {
-            align_left: true,
-            object: {
-                source: 'tmdb'
-            },
-            isparser: type == 'parser'
+
+        let line = new Line(data,source.params)
+
+        line.onDown = this.down.bind(this)
+        line.onUp   = this.up.bind(this)
+        line.onBack = this.back.bind(this)
+        line.onLeft = ()=>{}
+
+        line.onMore = ()=>{
+            if(source.onMore) source.onMore({data, line, query}, ()=>{
+                this.listener.send('select')
+            })
         }
 
-        if(type == 'parser'){
-            params.card_events = {
-                onMenu: ()=>{}
-            }
-        }
-
-        let item = new Line(data,params)
-
-        item.onDown = this.down
-        item.onUp   = this.up
-        item.onBack = this.back.bind(this)
-        item.onLeft = ()=>{
-            this.listener.send('left')
-        }
-
-        item.onEnter = ()=>{
-            this.listener.send('enter')
-        }
-
-        item.onMore = (e, element)=>{
-            if(type == 'parser'){
-                this.listener.send('enter')
-
-                Activity.push({
-                    url: '',
-                    title: 'Торренты',
-                    component: 'torrents',
-                    search: query,
-                    movie: {
-                        title: query,
-                        original_title: '',
-                        img: './img/img_broken.svg',
-                        genres: []
-                    },
-                    page: 1
-                })
-            }
-            else{
-                Activity.push({
-                    url: 'search/' + type,
-                    title: 'Поиск - ' + query,
-                    component: 'category_full',
-                    page: 2,
-                    query: encodeURIComponent(query),
-                    source: 'tmdb'
+        if(source.onSelect){
+            line.onSelect = (e, element)=>{
+                source.onSelect({data, line, query, element},()=>{
+                    this.listener.send('back')
                 })
             }
         }
-
-        if(type == 'parser'){
-            item.onEnter = false
-
-            item.onPrevent = (e, element)=>{
-                if(element.reguest && !element.MagnetUri){
-                    Parser.marnet(element, ()=>{
-                        Modal.close()
-
-                        Controller.toggle('search_results')
-
-                        Torrent.start(element, {
-                            title: element.Title
-                        })
-
-                        Torrent.back(this.toggle.bind(this))
-                    },(text)=>{
-                        Modal.update(Template.get('error',{title: 'Ошибка', text: text}))
-                    })
-
-                    Modal.open({
-                        title: '',
-                        html: Template.get('modal_pending',{text: 'Запрашиваю magnet ссылку'}),
-                        onBack: ()=>{
-                            Modal.close()
-            
-                            this.toggle()
-                        }
-                    })
-                }
-                else{
-                    Controller.toggle('search_results')
-
-                    Torrent.start(element, {
-                        title: element.Title
-                    })
-
-                    Torrent.back(this.toggle.bind(this))
-                }
+        else{
+            line.onEnter = ()=>{
+                this.listener.send('select')
             }
         }
 
-        item.create()
+        if(source.onRender) source.onRender(line)
 
-        items.push(item)
+        line.create()
 
-        scroll.append(item.render())
+        items.push(line)
+
+        html.append(line.render())
+
+        if(Storage.field('navigation_type') === 'mouse'){
+            line.render().on('mouseenter touchstart',function(){
+                if(!line.activated){
+                    line.activated = true
+
+                    active = items.indexOf(line)
+
+                    line.toggle()
+                }
+            })
+        }
     }
 
     this.any = function(){
@@ -201,20 +128,22 @@ function create(){
 
         items[active].toggle()
 
-        scroll.update(items[active].render())
+        this.listener.send('toggle',{element: items[active].render()})
     }
 
     this.up = function(){
         active--
+
+        if(active < 0) this.listener.send('up')
 
         if(active < 0){
             active = 0
         }
         else{
             items[active].toggle()
-        }
 
-        scroll.update(items[active].render())
+            this.listener.send('toggle',{element: items[active].render()})
+        }
     }
 
     this.clear = function(){
@@ -231,17 +160,16 @@ function create(){
         Controller.add('search_results',{
             invisible: true,
             toggle: ()=>{
-                Controller.collectionSet(scroll.render())
+                Controller.collectionSet(html)
 
                 if(items.length){
                     items[active].toggle()
+
+                    this.listener.send('toggle',{element: items[active].render()})
                 } 
             },
             back: ()=>{
                 this.listener.send('back')
-            },
-            left: ()=>{
-                this.listener.send('left')
             }
         })
 
@@ -249,17 +177,13 @@ function create(){
     }
 
     this.render = function(){
-        return scroll.render()
+        return html
     }
 
     this.destroy = function(){
         clearTimeout(timer)
 
-        Api.clear()
-
         this.clear()
-
-        scroll.destroy()
 
         this.listener.destroy()
     }

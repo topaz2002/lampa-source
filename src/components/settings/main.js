@@ -5,7 +5,7 @@ import Api from './api'
 
 function Main(){
     let comp
-    let scrl = new Scroll({mask:true,over:true})
+    let scrl = new Scroll({mask:true,over:true,step:200})
     let last
 
     /**
@@ -38,11 +38,11 @@ function Main(){
             }
         }
 
-        comp.find('.selector').unbind('hover:focus hover:enter').on('hover:focus',(event)=>{
+        comp.find('.selector').unbind('hover:focus').on('hover:focus',(event)=>{
             last = event.target
 
             scrl.update($(event.target),true)
-        }).on('hover:enter',(event)=>{
+        }).not('[data-static]').unbind('hover:enter').on('hover:enter',(event)=>{
             this.render().detach()
 
             this.onCreate($(event.target).data('component'))

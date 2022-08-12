@@ -3,6 +3,7 @@ import Scroll from '../../interaction/scroll'
 import Controller from '../../interaction/controller'
 import Storage from '../../utils/storage'
 import Arrays from '../../utils/arrays'
+import Lang from '../../utils/lang'
 
 function create(){
     let scroll,
@@ -15,7 +16,7 @@ function create(){
         scroll = new Scroll({
             over: true,
             mask:false,
-            nopadding: true
+            horizontal: true
         })
 
         keys = Storage.get('search_history','[]')
@@ -24,22 +25,35 @@ function create(){
             this.append(key)
         })
 
-        if(!keys.length) scroll.append('<div class="selector search-history-empty">История поиска пуста.</div>')
-
-        scroll.render().on('mouseover touchstart',()=>{
-            if(this.any() && Controller.enabled().name !== 'search_history') this.toggle()
-        })
+        if(!keys.length) scroll.append('<div class="selector search-history-empty">'+Lang.translate('search_empty')+'</div>')
     }
 
     this.append = function(value){
-        let key = $('<div class="search-history-key selector"><div><span>'+value+'</span><div>Влево - удалить</div></div></div>')
+        let key = $('<div class="search-history-key selector"><div><span>'+value+'</span></div></div>')
 
         key.on('hover:enter',()=>{
             this.listener.send('enter', {value: value})
         }).on('hover:focus',(e)=>{
             last = e.target
 
-            scroll.update($(e.target))
+            scroll.update($(e.target), true)
+        }).on('hover:long',()=>{
+            let selc = scroll.render().find('.selector')
+
+            Arrays.remove(keys,value)
+
+            Storage.set('search_history',keys)
+
+            let index = selc.index(key)
+
+            if(index > 0) last = selc.eq(index - 1)[0]
+            else if(selc[index + 1]) last = selc.eq(index + 1)[0]
+
+            key.remove()
+
+            if(selc.length - 1 <= 0) last = false
+
+            Controller.collectionFocus(last, scroll.render())
         })
 
         scroll.append(key)
@@ -48,6 +62,8 @@ function create(){
     this.add = function(value){
         if(keys.indexOf(value) == -1){
             Arrays.insert(keys,0,value)
+
+            if(keys.length > 10) keys = keys.slice(0,10)
 
             Storage.set('search_history',keys)
         }
@@ -60,38 +76,19 @@ function create(){
                 Controller.collectionFocus(last, scroll.render())
             },
             up: ()=>{
-                if(Navigator.canmove('up')) Navigator.move('up')
-                else this.listener.send('up')
+                this.listener.send('up')
             },
             down: ()=>{
-                Navigator.move('down')
+                this.listener.send('down')
             },
             right: ()=>{
-                this.listener.send('right')
+                Navigator.move('right')
             },
             back: ()=>{
                 this.listener.send('back')
             },
             left: ()=>{
-                let elem = scroll.render().find('.focus'),
-                    selc = scroll.render().find('.selector')
-
-                if(elem.length){
-                    Arrays.remove(keys,$('span',elem).text())
-
-                    Storage.set('search_history',keys)
-
-                    let index = selc.index(elem)
-
-                    if(index > 0) last = selc.eq(index - 1)[0]
-                    else if(selc[index + 1]) last = selc.eq(index + 1)[0]
-
-                    elem.remove()
-
-                    if(selc.length - 1 <= 0) last = false
-
-                    Controller.toggle('search_history')
-                }
+                Navigator.move('left')
             }
         })
 

@@ -7,13 +7,14 @@ import Arrays from '../../utils/arrays'
 import Storage from '../../utils/storage'
 import CustomSubs from './subs'
 import Normalization from './normalization'
+import Lang from '../../utils/lang'
 
 let listener = Subscribe()
+let html
+let display
+let paused
+let subtitles
 
-let html            = Template.get('player_video')
-let display         = html.find('.player-video__display')
-let paused          = html.find('.player-video__paused')
-let subtitles       = html.find('.player-video__subtitles')
 let timer           = {}
 let params          = {}
 let rewind_position = 0
@@ -24,33 +25,41 @@ let video
 let wait
 let neeed_sacle
 let neeed_sacle_last
+let neeed_speed
 let webos
 let hls
 let webos_wait = {}
 let normalization
 
-html.on('click',()=>{
-    if(Storage.field('navigation_type') == 'mouse') playpause()
-})
+function init(){
+    html      = Template.get('player_video')
+    display   = html.find('.player-video__display')
+    paused    = html.find('.player-video__paused')
+    subtitles = html.find('.player-video__subtitles')
 
-$(window).on('resize',()=>{
-    if(video){
-        neeed_sacle = neeed_sacle_last
+    html.on('click',()=>{
+        if(Storage.field('navigation_type') == 'mouse') playpause()
+    })
 
-        scale()
-    } 
-})
+    $(window).on('resize',()=>{
+        if(video){
+            neeed_sacle = neeed_sacle_last
 
-/**
- * Специально для вебось
- */
-listener.follow('webos_subs',(data)=>{
-    webos_wait.subs = convertToArray(data.subs)
-})
+            scale()
+        } 
+    })
 
-listener.follow('webos_tracks',(data)=>{
-    webos_wait.tracks = convertToArray(data.tracks)
-})
+    /**
+     * Специально для вебось
+     */
+    listener.follow('webos_subs',(data)=>{
+        webos_wait.subs = convertToArray(data.subs)
+    })
+
+    listener.follow('webos_tracks',(data)=>{
+        webos_wait.tracks = convertToArray(data.tracks)
+    })
+}
 
 /**
  * Переключаем субтитры с предыдущей серии
@@ -134,10 +143,10 @@ function bind(){
 
         if(msg.indexOf('EMPTY SRC') == -1){
             if(error.code == 3){
-                listener.send('error', {error: 'Не удалось декодировать видео'})
+                listener.send('error', {error: Lang.translate('player_error_one')})
             }
             else if(error.code == 4){
-                listener.send('error', {error: 'Видео не найдено или повреждено'})
+                listener.send('error', {error: Lang.translate('player_error_two')})
             }
             else if(typeof error.code !== 'undefined'){
                 listener.send('error', {error: 'code ['+error.code+'] details ['+msg+']'})
@@ -210,6 +219,8 @@ function bind(){
         listener.send('videosize',{width: video.videoWidth, height: video.videoHeight})
 
         scale()
+
+        if(neeed_speed) speed(neeed_speed)
 
         loaded()
     })
@@ -502,7 +513,9 @@ function loaded(){
  * @param {[{index:integer, label:string, url:string}]} subs 
  */
 function customSubs(subs){
-    video.customSubs = subs
+    video.customSubs = Arrays.clone(subs)
+
+    console.log('Player','custom subs', subs)
 
     customsubs = new CustomSubs()
 
@@ -514,7 +527,7 @@ function customSubs(subs){
 
     let index = -1
 
-    subs.forEach((sub)=>{
+    video.customSubs.forEach((sub)=>{
         index++
 
         if(typeof sub.index == 'undefined') sub.index = index
@@ -579,10 +592,15 @@ function create(){
         video = videobox[0]
 
         if(Storage.field('player_normalization')){
-            console.log('Player','normalization enabled')
-    
-            normalization = new Normalization()
-            normalization.attach(video)
+            try{
+                console.log('Player','normalization enabled')
+
+                normalization = new Normalization()
+                normalization.attach(video)
+            }
+            catch(e){
+                console.log('Player','normalization error:', e.stack)
+            }
         }
     }
 
@@ -647,7 +665,14 @@ function loader(status){
     if(/.m3u8/.test(src) && typeof Hls !== 'undefined'){
         if(navigator.userAgent.toLowerCase().indexOf('maple') > -1) src += '|COMPONENT=HLS'
 
-        if (Hls.isSupported()) {
+        if(Storage.field('player_hls_method') == 'application' && video.canPlayType('application/vnd.apple.mpegurl')){
+            console.log('Player','use hls:', 'application')
+
+            load(src)
+        }
+        else if(Hls.isSupported() && !(Platform.is('tizen') && Storage.field('player') == 'tizen')) {
+            console.log('Player','use hls:', 'program')
+
             try{
                 hls = new Hls()
                 hls.attachMedia(video)
@@ -840,6 +865,15 @@ function size(type){
     if(video.size) video.size(type)
 }
 
+function speed(value){
+    neeed_speed = value
+
+    let fv = value == 'default' ? 1 : parseFloat(value)
+
+    if(video.speed) video.speed(fv)
+    else video.playbackRate = fv
+}
+
 /**
  * Перемотка на позицию 
  * @param {number} type 
@@ -847,10 +881,27 @@ function size(type){
 function to(seconds){
     pause()
 
-    if(seconds == -1) video.currentTime = video.duration
+    if(seconds == -1) video.currentTime = video.duration - 3
     else video.currentTime = seconds
 
     play()
+}
+
+function enterToPIP(){
+    if (!document.pictureInPictureElement && document.pictureInPictureEnabled && video.requestPictureInPicture) {
+        video.requestPictureInPicture()
+    }
+}
+
+function exitFromPIP(){
+    if (document.pictureInPictureElement) {
+        document.exitPictureInPicture()
+    }
+}
+
+function togglePictureInPicture(){
+    if(document.pictureInPictureElement) exitFromPIP()
+    else enterToPIP()
 }
 
 /**
@@ -869,9 +920,13 @@ function destroy(savemeta){
     webos = null
     webos_wait = {}
 
+    let hls_destoyed = false
+
     if(hls){
         hls.destroy()
         hls = false
+
+        hls_destoyed = true
     }
 
     if(!savemeta){
@@ -881,7 +936,9 @@ function destroy(savemeta){
         }
     }
 
-    if(video){
+    exitFromPIP()
+
+    if(video && !hls_destoyed){
         if(video.destroy) video.destroy()
         else{
             video.src = ""
@@ -905,6 +962,7 @@ function render(){
 }
 
 export default {
+    init,
     listener,
     url,
     render,
@@ -914,6 +972,7 @@ export default {
     play,
     pause,
     size,
+    speed,
     subsview,
     customSubs,
     to,
@@ -921,5 +980,6 @@ export default {
     saveParams,
     clearParamas,
     setParams,
-    normalizationVisible
+    normalizationVisible,
+    togglePictureInPicture
 }

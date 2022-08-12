@@ -2,9 +2,116 @@ import Storage from '../storage'
 import Utils from '../math'
 import Reguest from '../reguest'
 import Account from '../account'
+import Lang from '../lang'
+import Search from '../../components/search'
+import Activity from '../../interaction/activity'
+import Torrent from '../../interaction/torrent'
+import Modal from '../../interaction/modal'
 
 let url
 let network = new Reguest()
+
+function init(){
+    let source = {
+        title: Lang.translate('title_parser'),
+        search: (params, oncomplite)=>{
+            get({
+                search: decodeURIComponent(params.query),
+                other: true,
+                from_search: true,
+                movie: {
+                    genres: [],
+                    title: decodeURIComponent(params.query),
+                    original_title: decodeURIComponent(params.query),
+                    number_of_seasons: 0
+                }
+            },(json)=>{
+                json.title   = Lang.translate('title_parser')
+                json.results = json.Results.slice(0,20)
+                json.Results = null
+    
+                json.results.forEach((element)=>{
+                    element.Title = Utils.shortText(element.Title,110)
+                })
+    
+                oncomplite([json])
+            },()=>{
+                oncomplite([])
+            })
+        },
+        onCancel: ()=>{
+            network.clear()
+        },
+        params: {
+            align_left: true,
+            isparser: true,
+            card_events: {
+                onMenu: ()=>{}
+            }
+        },
+        onMore: (params, close)=>{
+            close()
+
+            Activity.push({
+                url: '',
+                title: Lang.translate('title_torrents'),
+                component: 'torrents',
+                search: params.query,
+                movie: {
+                    title: params.query,
+                    original_title: '',
+                    img: './img/img_broken.svg',
+                    genres: []
+                },
+                page: 1
+            })
+        },
+        onSelect: (params, close)=>{
+            if(params.element.reguest && !params.element.MagnetUri){
+                marnet(params.element, ()=>{
+                    Modal.close()
+
+                    Torrent.start(params.element, {
+                        title: params.element.Title
+                    })
+
+                    Torrent.back(params.line.toggle.bind(params.line))
+                },(text)=>{
+                    Modal.update(Template.get('error',{title: Lang.translate('title_error'), text: text}))
+                })
+
+                Modal.open({
+                    title: '',
+                    html: Template.get('modal_pending',{text: Lang.translate('torrent_get_magnet')}),
+                    onBack: ()=>{
+                        Modal.close()
+        
+                        params.line.toggle()
+                    }
+                })
+            }
+            else{
+                Torrent.start(params.element, {
+                    title: params.element.Title
+                })
+
+                Torrent.back(params.line.toggle.bind(params.line))
+            }
+        }
+    }
+
+    Storage.listener.follow('change',(e)=>{
+        if(e.name == 'parse_in_search'){
+            Search.removeSource(source)
+
+            if(Storage.field('parse_in_search')) Search.addSource(source)
+        }
+    })
+
+    if(Storage.field('parse_in_search')){
+        Search.addSource(source)
+    }
+}
 
 function get(params = {}, oncomplite, onerror){
     function complite(data){
@@ -24,12 +131,17 @@ function get(params = {}, oncomplite, onerror){
         if(Storage.field('jackett_url')){
             url = Utils.checkHttp(Storage.field('jackett_url'))
 
-            jackett(params, complite, ()=>{
-                torlook(params, complite, error)
-            })
+            let ignore = params.from_search && !url.match(/\d+\.\d+\.\d+/g)
+
+            if(ignore) error('')
+            else{
+                jackett(params, complite, ()=>{
+                    torlook(params, complite, error)
+                })
+            }
         }
         else{
-            error('Укажите ссылку для парсинга Jackett')
+            error(Lang.translate('torrent_parser_set_link') + ': Jackett')
         }
     }
     else{
@@ -44,7 +156,7 @@ function get(params = {}, oncomplite, onerror){
         else if(Storage.field('torlook_parse_type') == 'native'){
             torlook(params, complite, error)
         }
-        else error('Укажите ссылку для парсинга TorLook')
+        else error(Lang.translate('torrent_parser_set_link') + ': TorLook')
     }
 }
 
@@ -77,14 +189,14 @@ function torlook(params = {}, oncomplite, onerror){
 }
 
 function torlookApi(params = {}, oncomplite, onerror){
-    network.timeout(1000 * 30)
+    network.timeout(1000 * Storage.field('parse_timeout'))
 
     let s = 'https://api.torlook.info/api.php?key=4JuCSML44FoEsmqK&s='
     let q = (params.search + '').replace(/( )/g, "+").toLowerCase()
     let u = Storage.get('native') || Storage.field('torlook_parse_type') == 'native' ? s + encodeURIComponent(q) : url.replace('{q}',encodeURIComponent(s + encodeURIComponent(q)))
 
     network.native(u,(json)=>{
-        if(json.error) onerror('Ошибка в запросе')
+        if(json.error) onerror(Lang.translate('torrent_parser_request_error'))
         else{
             let data = {
                 Results: []
@@ -113,12 +225,12 @@ function torlookApi(params = {}, oncomplite, onerror){
             oncomplite(data)
         }
     },(a,c)=>{
-        onerror(network.errorDecode(a,c))
+        onerror(Lang.translate('torrent_parser_no_responce'))
     })
 }
 
 function jackett(params = {}, oncomplite, onerror){
-    network.timeout(1000 * 15)
+    network.timeout(1000 * Storage.field('parse_timeout'))
 
     let u      = url + '/api/v2.0/indexers/all/results?apikey='+Storage.field('jackett_key')+'&Query='+encodeURIComponent(params.search)
     let genres = params.movie.genres.map((a)=>{
@@ -146,7 +258,7 @@ function jackett(params = {}, oncomplite, onerror){
 
         oncomplite(json)
     },(a,c)=>{
-        onerror(network.errorDecode(a,c))
+        onerror(Lang.translate('torrent_parser_no_responce'))
     })
 }
 
@@ -165,7 +277,7 @@ function marnet(element, oncomplite, onerror){
             oncomplite()
         }
         else{
-            onerror('Неудалось получить magnet ссылку')
+            onerror(Lang.translate('torrent_parser_magnet_error'))
         }
     },(a,c)=>{
         onerror(network.errorDecode(a,c))
@@ -177,6 +289,7 @@ function clear(){
 }
 
 export default {
+    init,
     get,
     torlook,
     jackett,

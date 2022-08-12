@@ -12,7 +12,8 @@ function cdnmovies(component, _object){
 
     let choice = {
         season: 0,
-        voice: 0
+        voice: 0,
+        voice_name: ''
     }
 
     /**
@@ -37,7 +38,7 @@ function cdnmovies(component, _object){
                 this.find(iframe)
             }
             else{
-                component.empty('По запросу (' + select_title + ') нет результатов')
+                component.emptyForQuery(select_title)
             }
         },(a, c)=>{
             component.empty(network.errorDecode(a, c))
@@ -71,7 +72,8 @@ function cdnmovies(component, _object){
 
         choice = {
             season: 0,
-            voice: 0
+            voice: 0,
+            voice_name: ''
         }
 
         filter()
@@ -89,6 +91,8 @@ function cdnmovies(component, _object){
      */
     this.filter = function(type, a, b){
         choice[a.stype] = b.index
+
+        if(a.stype == 'voice') choice.voice_name = filter_items.voice[b.index]
 
         component.reset()
 
@@ -131,10 +135,10 @@ function cdnmovies(component, _object){
 
                     append(filtred())
                 }
-                else component.empty('По запросу (' + select_title + ') нет результатов')
+                else component.emptyForQuery(select_title)
             }
         }
-        else component.empty('По запросу (' + select_title + ') нет результатов')
+        else component.emptyForQuery(select_title)
     }
 
     function decode(data) {
@@ -210,6 +214,15 @@ function cdnmovies(component, _object){
             if(!filter_items.voice[choice.voice]) choice.voice = 0
         }
 
+        if(choice.voice_name){
+            let inx = filter_items.voice.indexOf(choice.voice_name)
+            
+            if(inx == -1) choice.voice = 0
+            else if(inx !== choice.voice){
+                choice.voice = inx
+            }
+        }
+
         component.filter(filter_items, choice)
     }
 
@@ -271,7 +284,7 @@ function cdnmovies(component, _object){
         let viewed = Lampa.Storage.cache('online_view', 5000, [])
 
         items.forEach(element => {
-            if(element.season) element.title = 'S'+element.season + ' / Серия ' + element.episode
+            if(element.season) element.title = 'S'+element.season + ' / ' + Lampa.Lang.translate('torrent_serial_episode') + ' ' + element.episode
 
             element.info = element.season ? ' / ' + Lampa.Utils.shortText(filter_items.voice[choice.voice], 50) : ''
 
@@ -339,7 +352,7 @@ function cdnmovies(component, _object){
                         Lampa.Storage.set('online_view', viewed)
                     }
                 }
-                else Lampa.Noty.show('Не удалось извлечь ссылку')
+                else Lampa.Noty.show(Lampa.Lang.translate('online_nolink'))
             })
 
             component.append(item)

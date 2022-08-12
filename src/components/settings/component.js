@@ -6,9 +6,10 @@ import Storage from '../../utils/storage'
 import Platform from '../../utils/platform'
 import Noty from '../../interaction/noty'
 import Api from './api'
+import Lang from '../../utils/lang'
 
-function Component(name){
-    let scrl = new Scroll({mask: true, over:true})
+function Component(name, component_params = {}){
+    let scrl = new Scroll({mask: true, over:true, step: 200})
     let comp = Template.get('settings_'+name)
     let last
 
@@ -39,10 +40,14 @@ function Component(name){
             comp.find('.is--player').remove()
         }
 
+        if(!Platform.is('nw')){
+            comp.find('.is--nw').remove()
+        }
+
         scrl.render().find('.scroll__content').addClass('layer--wheight').data('mheight',$('.settings__head'))
 
         comp.find('.clear-storage').on('hover:enter',()=>{
-            Noty.show('Кеш и данные очищены')
+            Noty.show(Lang.translate('settings_clear_cache'))
 
             localStorage.clear()
 
@@ -114,6 +119,8 @@ function Component(name){
         addParams()
 
         buildEvents()
+
+        if(typeof component_params.last_index !== 'undefined' && component_params.last_index > 0) last = comp.find('.selector').eq(component_params.last_index)[0]
 
         Controller.add('settings_component',{
             toggle: ()=>{

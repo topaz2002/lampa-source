@@ -101,7 +101,7 @@ function subscribe(data){
 
                 console.log('Tracks','subs original', orig)
 
-                Object.defineProperty(elem, "enabled", {
+                Object.defineProperty(elem, "mode", {
                     set: (v)=>{
                         if(v){
                             let txt = getSubs()
@@ -220,7 +220,7 @@ function subscribe(data){
     function listenStart(){
         inited = true
 
-        let socket = new WebSocket('ws://185.255.132.210:8080/?'+data.torrent_hash+'&index='+data.id)
+        let socket = new WebSocket('ws://185.204.0.61:8080/?'+data.torrent_hash+'&index='+data.id)
 
         socket.addEventListener('message', (event)=> {
             try{

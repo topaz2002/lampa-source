@@ -4,6 +4,7 @@ import Subscribe from '../utils/subscribe'
 import Controller from './controller'
 import Head from '../components/head'
 import Storage from '../utils/storage'
+import Lang from '../utils/lang'
 
 let listener  = Subscribe()
 let activites = []
@@ -31,9 +32,14 @@ function Activity(component){
      * Создает новую активность
      */
     this.create = function(){
-        component.create(body)
+        try{
+            component.create(body)
 
-        body.append(component.render())
+            body.append(component.render())
+        }
+        catch(e){
+
+        }
     }
 
     /**
@@ -138,6 +144,13 @@ function Activity(component){
      */
     this.destroy = function(){
         component.destroy()
+
+        //после create работает долгий запрос и затем вызывается build, однако уже было вызвано destroy и возникают ошибки, поэтому заодно чистим функцию build и empty
+        for(let f in component){
+            if(typeof component[f] == 'function'){
+                component[f] = function(){}
+            }
+        }
 
         slide.remove()
     }
@@ -267,6 +280,20 @@ function all(){
 }
 
 /**
+ * Получить рендеры всех активностей
+ * @returns {array}
+ */
+function renderLayers(){
+    let result = []
+
+    all().forEach(item=>{
+        if(item.activity) result.push(item.activity.render())
+    })
+
+    return result
+}
+
+/**
  * Обработать событие назад
  */
 function backward(){
@@ -297,7 +324,11 @@ function backward(){
     previous_tree = activites.slice(-1)[0]
     
     if(previous_tree){
-        if(previous_tree.activity) start(previous_tree)
+        if(previous_tree.activity){
+            start(previous_tree)
+            
+            Lampa.Listener.send('activity',{component: previous_tree.component, type: 'archive', object: previous_tree})
+        }
         else {
             create(previous_tree)
 
@@ -374,7 +405,7 @@ function last(){
         if(action == 'favorite') {
             push({
                 url: '',
-                title: type == 'book' ? 'Закладки' : type == 'like' ? 'Нравится' : type == 'history' ? 'История просмотров' : 'Позже',
+                title: type == 'book' ? Lang.translate('title_book') : type == 'like' ? Lang.translate('title_like') : type == 'history' ? Lang.translate('title_history') : Lang.translate('title_wath'),
                 component: 'favorite',
                 type: type,
                 page: 1
@@ -383,7 +414,7 @@ function last(){
         else if(action == 'mytorrents') {
             push({
                 url: '',
-                title: 'Мои торренты',
+                title: Lang.translate('title_mytorrents'),
                 component: 'mytorrents',
                 page: 1
             })
@@ -391,7 +422,7 @@ function last(){
         else {
             push({
                 url: '',
-                title: 'Главная - ' + Storage.field('source').toUpperCase(),
+                title: Lang.translate('title_main') + ' - ' + Storage.field('source').toUpperCase(),
                 component: 'main',
                 source: Storage.field('source'),
                 page: 1
@@ -466,5 +497,6 @@ export default {
     replace,
     active,
     all,
-    extractObject
+    extractObject,
+    renderLayers
 }

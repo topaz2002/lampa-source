@@ -2,21 +2,29 @@ import Template from '../template'
 import Subscribe from '../../utils/subscribe'
 import Utils from '../../utils/math'
 import Reguest from '../../utils/reguest'
+import Lang from '../../utils/lang'
+import Storage from '../../utils/storage'
 
-let html     = Template.get('player_info')
+let html
 let listener = Subscribe()
 let network  = new Reguest()
-let elems    = {
-    name:  $('.player-info__name',html),
-    size:  $('.value--size span',html),
-    stat:  $('.value--stat span',html),
-    speed: $('.value--speed span',html),
-    error: $('.player-info__error',html)
-}
+let elems
 
 let error, stat_timer
 
-Utils.time(html)
+function init(){
+    html = Template.get('player_info')
+    
+    elems = {
+        name:  $('.player-info__name',html),
+        size:  $('.value--size span',html),
+        stat:  $('.value--stat span',html),
+        speed: $('.value--speed span',html),
+        error: $('.player-info__error',html)
+    }
+
+    Utils.time(html)
+}
 
 /**
  * Установить значение
@@ -62,7 +70,7 @@ function stat(url){
 
         network.silent(url.replace('preload', 'stat').replace('play', 'stat'), function (data) {
             elems.stat.text((data.active_peers || 0) + ' / ' + (data.total_peers || 0) + ' • ' + (data.connected_seeders || 0) + ' seeds')
-            elems.speed.text(data.download_speed ? Utils.bytesToSize(data.download_speed * 8, true) + '/c' : '0.0')
+            elems.speed.text(data.download_speed ? Utils.bytesToSize(data.download_speed * 8, true) + (Storage.get('language') == 'en' ? '' : '/c')  : '0.0')
 
             listener.send('stat', {data: data})
         })
@@ -81,11 +89,15 @@ function toggle(status){
     html.toggleClass('info--visible',status)
 }
 
+function loading(){
+    elems.size.text(Lang.translate('loading') + '...')
+}
+
 /**
  * Уничтожить
  */
 function destroy(){
-    elems.size.text('Загрузка...')
+    elems.size.text(Lang.translate('loading') + '...')
     elems.stat.text('')
     elems.speed.text('')
     elems.error.addClass('hide')
@@ -101,9 +113,11 @@ function render(){
 }
 
 export default {
+    init,
     listener,
     render,
     set,
     toggle,
+    loading,
     destroy
 }

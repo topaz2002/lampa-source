@@ -1,5 +1,6 @@
 import Storage from './storage'
 import Api from '../interaction/api'
+import Lang from './lang'
 
 function secondsToTime(sec, short){
     var sec_num = parseInt(sec, 10);
@@ -42,14 +43,14 @@ function declOfNum(n, text_forms) {
 function bytesToSize(bytes, speed) {
 
     if(bytes == 0) {
-        return '0 Байт';
+        return Lang.translate('size_zero');
     }
     var unitMultiple = 1024; 
-    var unitNames = ['Байт', 'КБ', 'МБ', 'ГБ', 'ТБ', 'ПБ'];
+    var unitNames = [Lang.translate('size_byte'), Lang.translate('size_kb'), Lang.translate('size_mb'), Lang.translate('size_gb'), Lang.translate('size_tb'), Lang.translate('size_pp')];
 
     if(speed){
         unitMultiple = 1000;
-        unitNames = ['бит', 'Кбит', 'Мбит', 'Гбит', 'Тбит', 'Пбит'];
+        unitNames = [Lang.translate('speed_bit'), Lang.translate('speed_kb'), Lang.translate('speed_mb'), Lang.translate('speed_gb'), Lang.translate('speed_tb'), Lang.translate('speed_pp')];
     }
 
     var unitChanges = Math.floor(Math.log(bytes) / Math.log(unitMultiple));
@@ -78,35 +79,22 @@ function calcBitrate(byteSize, minutes){
     return ((bitSize / Math.pow(1000, 2)) / sec).toFixed(2) ;
 }
 
+function getMoths(ended){
+    let need = ended ? '_e' : ''
+    let all  = []
+
+    for(let i = 1; i <= 12; i++){
+        all.push(Lang.translate('month_' + i + need))
+    }
+
+    return all
+}
+
 function time(html){
     let create = function(){
-        let months = [
-            'Январь',
-            'Февраль',
-            'Март',
-            'Апрель',
-            'Ма',
-            'Июнь',
-            'Июль',
-            'Август',
-            'Сентябрь',
-            'Октябрь',
-            'Ноябрь',
-            'Декабрь',
-        ]
-
-
-
-        let days = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
-
-        this.moth = function(m){
-            let n = months[m]
-            let d = n.slice(-1)
-
-            if(d == 'ь') return n.slice(0,n.length-1)+'я'
-            else if(n == 'Ма') return n+'я'
-            else  return n+'а'
-        }
+        let months     = getMoths()
+        let months_end = getMoths(true)
+        let days       = [Lang.translate('day_7'), Lang.translate('day_1'), Lang.translate('day_2'), Lang.translate('day_3'), Lang.translate('day_4'), Lang.translate('day_5'), Lang.translate('day_6')];
 
         this.tik = function(){
             let date = new Date(),
@@ -129,7 +117,7 @@ function time(html){
             $('.time--week',html).text(days[current_week]);
             $('.time--day',html).text(current_day);
             $('.time--moth',html).text(months[date.getMonth()]);
-            $('.time--full',html).text(current_day + ' ' + this.moth(date.getMonth()) + ' ' +  time[3]);
+            $('.time--full',html).text(current_day + ' ' + months_end[date.getMonth()] + ' ' +  time[3]);
         }
 
         setInterval(this.tik.bind(this),1000)
@@ -141,31 +129,9 @@ function time(html){
 }
 
 function parseTime(str){
-    let months = [
-        'Январь',
-        'Февраль',
-        'Март',
-        'Апрель',
-        'Ма',
-        'Июнь',
-        'Июль',
-        'Август',
-        'Сентябрь',
-        'Октябрь',
-        'Ноябрь',
-        'Декабрь',
-    ]
-
-    let days = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"]
-
-    let mouth = function(m){
-        let n = months[m]
-        let d = (n + '').slice(-1)
-
-        if(d == 'ь') return n.slice(0,n.length-1)+'я'
-        else if(n == 'Ма') return n+'я'
-        else  return n+'а'
-    }
+    let months     = getMoths()
+    let months_end = getMoths(true)
+    let days = [Lang.translate('day_7'), Lang.translate('day_1'), Lang.translate('day_2'), Lang.translate('day_3'), Lang.translate('day_4'), Lang.translate('day_5'), Lang.translate('day_6')]
 
     let date = new Date(str),
         time = [date.getHours(),date.getMinutes(),date.getSeconds(),date.getFullYear()]
@@ -183,8 +149,8 @@ function parseTime(str){
         week: days[current_week],
         day: current_day,
         mouth: months[date.getMonth()],
-        full: current_day + ' ' + mouth(date.getMonth()) + ' ' +  time[3],
-        short: current_day + ' ' + mouth(date.getMonth())
+        full: current_day + ' ' + months_end[date.getMonth()] + ' ' +  time[3],
+        short: current_day + ' ' + months_end[date.getMonth()]
     }
 }
 
@@ -201,6 +167,7 @@ function strToTime(str){
 }
 
 function checkHttp(url){
+    url = url + ''
     url = url.replace(/https:\/\//,'')
     url = url.replace(/http:\/\//,'')
 
@@ -233,7 +200,7 @@ function addUrlComponent (url, params){
     return url + (/\?/.test(url) ? '&' : '?') + params;
 }
 
-function putScript(items, complite, error){
+function putScript(items, complite, error, success){
     var p = 0;
     
     function next(){
@@ -252,6 +219,8 @@ function putScript(items, complite, error){
         var s = document.createElement('script')
             s.onload = ()=>{
                 console.log('Script','include:',u)
+
+                if(success) success(u)
 
                 next()
             }
@@ -413,6 +382,21 @@ function isTouchDevice() {
         (navigator.msMaxTouchPoints > 0));
 }
 
+function toggleFullscreen(){
+    let doc  = window.document
+    let elem = doc.documentElement
+
+    let requestFullScreen = elem.requestFullscreen || elem.mozRequestFullScreen || elem.webkitRequestFullScreen || elem.msRequestFullscreen
+    let cancelFullScreen  = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen
+
+    if(!doc.fullscreenElement && !doc.mozFullScreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement) {
+        requestFullScreen.call(elem)
+    }
+    else {
+        cancelFullScreen.call(doc)
+    }
+}
+
 export default {
     secondsToTime,
     secondsToTimeHuman,
@@ -439,5 +423,6 @@ export default {
     uid,
     copyTextToClipboard,
     imgLoad,
-    isTouchDevice
+    isTouchDevice,
+    toggleFullscreen
 }

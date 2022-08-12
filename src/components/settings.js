@@ -4,20 +4,23 @@ import Component from './settings/component'
 import Main from './settings/main'
 import Subscribe from '../utils/subscribe'
 
-let html     = Template.get('settings')
-let body     = html.find('.settings__body')
+let html
+let body
 let listener = Subscribe()
-let last     = ''
+let last = ''
 let main
-
-html.find('.settings__layer').on('click',()=>{
-    window.history.back()
-})
 
 /**
  * Запуск
  */
 function init(){
+    html     = Template.get('settings')
+    body     = html.find('.settings__body')
+    
+    html.find('.settings__layer').on('click',()=>{
+        window.history.back()
+    })
+
     main = new Main()
     main.onCreate = create
 
@@ -25,6 +28,7 @@ function init(){
 
     Controller.add('settings',{
         toggle: ()=>{
+            main.render().detach()
             main.update()
             
             listener.send('open', {
@@ -63,15 +67,17 @@ function init(){
 /**
  * Создать компонент
  * @param {string} name 
+ * @param {{last_index:integer}} params 
  */
-function create(name){
-    let comp = new Component(name)
+function create(name, params = {}){
+    let comp = new Component(name, params)
 
     body.empty().append(comp.render())
 
     listener.send('open', {
         name: name,
-        body: comp.render()
+        body: comp.render(),
+        params
     })
 
     last = name
@@ -83,7 +89,10 @@ function create(name){
  * Обновить открытый компонент
  */
 function update(){
-    create(last)
+    let selects = body.find('.selector')
+    let lastinx = selects.index(body.find('.selector.focus'))
+
+    create(last, {last_index: lastinx})
 }
 
 /**

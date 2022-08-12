@@ -5,6 +5,7 @@ import Keypad from '../interaction/keypad'
 import Template from '../interaction/template'
 import Scroll from '../interaction/scroll'
 import Noty from './noty'
+import Iframe from './iframe'
 
 let items = {}
 let times = 0
@@ -82,6 +83,22 @@ function show(name){
             item.on('hover:focus',(e)=>{
                 scroll_body.update($(e.target))
             })
+
+            if(name == 'Request'){
+                item.on('hover:enter',(e)=>{
+                    let str = item.text()
+                    let mth = str.match(/error of (.*?) :/)
+
+                    if(mth && mth[1]){
+                        Iframe.show({
+                            url: mth[1],
+                            onBack: ()=>{
+                                Controller.toggle('console-body')
+                            }
+                        })
+                    }
+                })
+            }
     
             scroll_body.append(item)
         })
@@ -172,22 +189,27 @@ function escapeHtml(text) {
 
 function decode(arr){
     if(Arrays.isObject(arr) || Arrays.isArray(arr)){
-        arr = JSON.stringify(arr);
+        try{
+            arr = JSON.stringify(arr)
+        }
+        catch(e){
+            arr = '[noview]'
+        }
     }
     else if(typeof arr === 'string' || typeof arr === 'number'  || typeof arr === 'boolean'){
         arr = escapeHtml(arr + '')
     }
     else{
-        var a = [];
+        var a = []
 
         for(var i in arr){
-            a.push(i + ': ' + arr[i]);
+            a.push(i + ': ' + arr[i])
         }
 
-        arr = JSON.stringify(a);
+        arr = JSON.stringify(a)
     }
 
-    arr = Utils.shortText(arr,600);
+    arr = Utils.shortText(arr,600)
 
     return arr
 }

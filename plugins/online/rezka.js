@@ -10,7 +10,8 @@ function rezka(component, _object){
 
     let choice = {
         season: 0,
-        voice: 0
+        voice: 0,
+        voice_name: ''
     }
 
     /**
@@ -40,7 +41,8 @@ function rezka(component, _object){
 
         choice = {
             season: 0,
-            voice: 0
+            voice: 0,
+            voice_name: ''
         }
 
         component.loading(true)
@@ -58,6 +60,8 @@ function rezka(component, _object){
      */
      this.filter = function(type, a, b){
         choice[a.stype] = b.index
+
+        if(a.stype == 'voice') choice.voice_name = filter_items.voice[b.index]
 
         component.reset()
 
@@ -106,7 +110,7 @@ function rezka(component, _object){
             extractData(str)
 
             if(extract.voice.length) call(extract.voice[0].token)
-            else component.empty('По запросу (' + select_title + ') нет результатов')
+            else component.emptyForQuery(select_title)
         },(a,c)=>{
             component.empty(network.errorDecode(a, c))
         },false,{
@@ -184,6 +188,15 @@ function rezka(component, _object){
         filter_items  = {
             season: extract.season.map(v=>v.name),
             voice: extract.season.length ? extract.voice.map(v=>v.name) : []
+        }
+
+        if(choice.voice_name){
+            let inx = filter_items.voice.indexOf(choice.voice_name)
+            
+            if(inx == -1) choice.voice = 0
+            else if(inx !== choice.voice){
+                choice.voice = inx
+            }
         }
         
         component.filter(filter_items, choice)
@@ -439,6 +452,8 @@ function rezka(component, _object){
             })
         }
 
+        let last_episode = component.getLastEpisode(items)
+
         items.forEach(element => {
             let hash = Lampa.Utils.hash(element.season ? [element.season,element.episode,object.movie.original_title].join('') : object.movie.original_title)
             let view = Lampa.Timeline.view(hash)
@@ -447,6 +462,11 @@ function rezka(component, _object){
             let hash_file = Lampa.Utils.hash(element.season ? [element.season,element.episode,object.movie.original_title,element.voice.name].join('') : object.movie.original_title + element.voice.name)
 
             element.timeline = view
+
+            if(element.season){
+                element.translate_episode_end = last_episode
+                element.translate_voice       = element.voice.name
+            }
 
             item.append(Lampa.Timeline.render(view))
 
@@ -469,7 +489,37 @@ function rezka(component, _object){
 
                     Lampa.Player.play(first)
 
-                    Lampa.Player.playlist([first])
+                    if(element.season && Lampa.Platform.version){
+                        let playlist = []
+
+                        items.forEach(elem => {
+                            let cell = {
+                                url: (call)=>{
+                                    getStream(elem,(stream)=>{
+                                        cell.url = stream
+                                        cell.quality = elem.qualitys
+
+                                        call()
+                                    },()=>{
+                                        cell.url = ''
+
+                                        call()
+                                    })
+                                },
+                                timeline: elem.timeline,
+                                title: elem.title,
+                            }
+
+                            if(elem == element) cell.url = stream
+
+                            playlist.push(cell)
+                        })
+
+                        Lampa.Player.playlist(playlist)
+                    }
+                    else{
+                        Lampa.Player.playlist([first])
+                    }
 
                     if(element.subtitles && Lampa.Player.subtitles) Lampa.Player.subtitles(element.subtitles)
 
@@ -481,7 +531,7 @@ function rezka(component, _object){
                         Lampa.Storage.set('online_view', viewed)
                     }
                 },()=>{
-                    Lampa.Noty.show('Не удалось извлечь ссылку')
+                    Lampa.Noty.show(Lampa.Lang.translate('online_nolink'))
                 })
             })
 
@@ -492,6 +542,7 @@ function rezka(component, _object){
                 view,
                 viewed,
                 hash_file,
+                element,
                 file: (call)=>{ getStream(element,(stream)=>{call({file:stream,quality:element.qualitys})})}
             })
         })

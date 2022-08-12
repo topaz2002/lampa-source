@@ -19,8 +19,11 @@ function create(params = {}){
 
     html.on('mousewheel',(e)=>{
         let parent = $(e.target).parents('.scroll')
+        let inner  = onTheRightSide(e, true)
 
-        if(Storage.field('navigation_type') == 'mouse' && Date.now() - scroll_time > 100 && html.is(parent[0])){
+        if(!params.horizontal && html.is(parent[0])) inner = true
+
+        if(Storage.field('navigation_type') == 'mouse' && Date.now() - scroll_time > 100 && inner){
             scroll_time = Date.now()
 
             if(e.originalEvent.wheelDelta / 120 > 0) {
@@ -34,83 +37,17 @@ function create(params = {}){
                 this.wheel(scroll_step)
             }
         }
+    }).on('mousemove',(e)=>{
+        html.toggleClass('scroll--horizontal-scroll',Boolean(onTheRightSide(e)))
     })
 
-    /*
-    let drag = {
-        start: {
-            x: 0,
-            y: 0
-        },
-        move: {
-            x: 0,
-            y: 0
-        },
-        difference : 0,
-        speed: 0,
-        position: 0,
-        animate: false,
-        enable: false
+    function onTheRightSide(e, inleft = false){
+        let offset   = content.offset().left
+        let width    = window.innerWidth - offset
+        let position = e.clientX - offset
+
+        return params.horizontal ? position > width / 2 : inleft ? position < width / 2 : false
     }
-
-    html.on('touchstart',(e)=>{
-        drag.start.x = e.touches[0].clientX
-        drag.start.y = e.touches[0].clientY
-
-        drag.position = body.data('scroll') || 0
-
-        body.toggleClass('notransition',true)
-
-        let parent = $(e.target).parents('.scroll')
-
-        drag.enable = html.is(parent[0])
-
-        clearInterval(drag.time)
-        clearTimeout(drag.time_animate)
-
-        if(drag.enable){
-            drag.animate = true
-
-            drag.time_animate = setTimeout(()=>{
-                drag.animate = false
-            },200)
-        }
-    })
-
-    html.on('touchmove',(e)=>{
-        if(drag.enable){
-            drag.move.x = e.touches[0].clientX
-            drag.move.y = e.touches[0].clientY
-
-            let dir = params.horizontal ? 'x' : 'y'
-
-            drag.difference = drag.move[dir] - drag.start[dir]
-            drag.speed      = drag.difference
-
-            touchTo(drag.position + drag.difference)
-        }
-    })
-
-    html.on('touchend',(e)=>{
-        body.toggleClass('notransition',false)
-
-        if(drag.animate) touchTo((body.data('scroll') || 0) + drag.speed)
-
-        drag.enable = false
-        drag.speed  = 0
-
-        clearInterval(drag.time)
-        clearTimeout(drag.time_animate)
-    })
-
-    function touchTo(offset){
-        offset = maxOffset(offset)
-
-        body.css('transform','translate3d('+(params.horizontal ? offset : 0)+'px, '+(params.horizontal ? 0 : offset)+'px, 0px)')
-
-        body.data('scroll',offset)
-    }
-    */
 
     function maxOffset(offset){
         let w = params.horizontal ? html.width() : html.height()
@@ -184,7 +121,9 @@ function create(params = {}){
 
         let ofs_elm = elem.offset()[dir],
             ofs_box = body.offset()[dir],
+            vieport = html[siz](),
             center  = ofs_box + (tocenter ? (content[siz]() / 2) - elem[siz]() / 2 : 0),
+            size    = body[siz](),
             scrl    = Math.min(0,center - ofs_elm)
             scrl    = maxOffset(scrl)
 
@@ -205,6 +144,32 @@ function create(params = {}){
             }
 
             body.data('scroll', scrl)
+
+            if(this.onScroll) this.onScroll({
+                position: scrl,
+                direstion: dir,
+                size: size,
+                vieport: vieport
+            })
+
+            if(this.onEnd && this.isEnd()) this.onEnd()
+    }
+
+    this.isEnd = function(){
+        if($('body').hasClass('touch-device')){
+            let scrl    = html.scrollTop(),
+                size    = body[0][params.horizontal ? 'scrollWidth' : 'scrollHeight'],
+                vieport = html[params.horizontal ? 'width' : 'height']()
+
+            return size - (vieport * Math.max(1,params.end_ratio || 1)) < Math.abs(scrl) 
+        }
+        else{
+            let scrl    = body.data('scroll'),
+                size    = body[params.horizontal ? 'width' : 'height'](),
+                vieport = html[params.horizontal ? 'width' : 'height']()
+
+            return size - (vieport * Math.max(1,params.end_ratio || 1)) < Math.abs(scrl)
+        }
     }
 
     this.append = function(object){
@@ -247,10 +212,6 @@ function create(params = {}){
 
     this.destroy = function(){
         html.remove()
-
-        body    = null
-        content = null
-        html    = null
     }
 }
 

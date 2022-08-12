@@ -4,12 +4,15 @@ function videocdn(component, _object){
     let results  = []
     let object   = _object
     let select_title = ''
+    let get_links_wait = false
 
     let filter_items = {}
 
     let choice = {
         season: 0,
-        voice: 0
+        voice: 0,
+        voice_name: '',
+        voice_id: 0
     }
 
     /**
@@ -20,6 +23,8 @@ function videocdn(component, _object){
         object = _object
 
         select_title = object.movie.title
+
+        get_links_wait = true
 
         let url  = component.proxy('videocdn') + 'http://cdn.svetacdn.in/api/'
         let itm  = data[0]
@@ -40,7 +45,7 @@ function videocdn(component, _object){
 
             component.loading(false)
 
-            if(!results.length) component.empty('По запросу (' + select_title + ') нет результатов')
+            if(!results.length) component.emptyForQuery(select_title)
 
         },(a,c)=>{
             component.empty(network.errorDecode(a, c))
@@ -59,7 +64,9 @@ function videocdn(component, _object){
 
         choice = {
             season: 0,
-            voice: 0
+            voice: 0,
+            voice_name: '',
+            voice_id: 0
         }
 
         filter()
@@ -77,6 +84,11 @@ function videocdn(component, _object){
      */
     this.filter = function(type, a, b){
         choice[a.stype] = b.index
+
+        if(a.stype == 'voice'){
+            choice.voice_name = filter_items.voice[b.index]
+            choice.voice_id = filter_items.voice_info[b.index] && filter_items.voice_info[b.index].id
+        } 
 
         component.reset()
 
@@ -166,7 +178,7 @@ function videocdn(component, _object){
      * @param {Arrays} results 
      */
     function extractData(results){
-        network.timeout(5000)
+        network.timeout(20000)
 
         let movie = results.slice(0,1)[0]
 
@@ -176,6 +188,10 @@ function videocdn(component, _object){
             let src = movie.iframe_src;
 
             network.native('http:'+src,(raw)=>{
+                get_links_wait = false
+
+                component.render().find('.broadcast__scan').remove()
+
                 let math = raw.replace(/\n/g,'').match(/id="files" value="(.*?)"/)
 
                 if(math){
@@ -220,7 +236,11 @@ function videocdn(component, _object){
                     }
                 }
 
-            },false,false,{dataType: 'text'})
+            },()=>{
+                get_links_wait = false
+
+                component.render().find('.broadcast__scan').remove()
+            },false,{dataType: 'text'})
         }
     }
 
@@ -335,7 +355,7 @@ function videocdn(component, _object){
                 let s = movie.season_count
 
                 while(s--){
-                    filter_items.season.push('Сезон ' + (movie.season_count - s))
+                    filter_items.season.push(Lampa.Lang.translate('torrent_serial_season') + ' ' + (movie.season_count - s))
                 }
             }
 
@@ -343,8 +363,8 @@ function videocdn(component, _object){
                 movie.episodes.forEach(episode=>{
                     if(episode.season_num == choice.season + 1){
                         episode.media.forEach(media=>{
-                            if(filter_items.voice.indexOf(media.translation.smart_title) == -1){
-                                filter_items.voice.push(media.translation.smart_title)
+                            if(!filter_items.voice_info.find(v=>v.id == media.translation.id)){
+                                filter_items.voice.push(media.translation.shorter_title)
                                 filter_items.voice_info.push({
                                     id: media.translation.id
                                 })
@@ -354,6 +374,23 @@ function videocdn(component, _object){
                 })
             }
         })
+
+        if(choice.voice_name){
+            let inx = -1
+
+            if(choice.voice_id){
+                let voice = filter_items.voice_info.find(v=>v.id == choice.voice_id)
+
+                if(voice) inx = filter_items.voice_info.indexOf(voice)
+            }
+
+            if(inx == -1) inx = filter_items.voice.indexOf(choice.voice_name)
+            
+            if(inx == -1) choice.voice = 0
+            else if(inx !== choice.voice){
+                choice.voice = inx
+            }
+        }
 
         component.filter(filter_items, choice)
     }
@@ -371,8 +408,21 @@ function videocdn(component, _object){
             results.slice(0,1).forEach(movie=>{
                 movie.episodes.forEach(episode=>{
                     if(episode.season_num == filter_data.season + 1){
+                        let temp   = episode.media.map(m=>m)
+                        let unique = []
+
+                        temp.sort((a,b)=>{
+                            return b.max_quality - a.max_quality
+                        })
+
+                        temp.forEach(m=>{
+                            if(!unique.find(a=>a.translation.id == m.translation.id)){
+                                unique.push(m)
+                            }
+                        })
+
                         episode.media.forEach(media=>{
-                            if(media.translation.id == filter_items.voice_info[filter_data.voice].id){
+                            if(media.translation.id == filter_items.voice_info[filter_data.voice].id && unique.indexOf(media) !== -1){
                                 filtred.push({
                                     episode: parseInt(episode.num),
                                     season: episode.season_num,
@@ -385,7 +435,6 @@ function videocdn(component, _object){
                     }
                 })
             })
-
         }
         else{
             results.slice(0,1).forEach(movie=>{
@@ -409,12 +458,21 @@ function videocdn(component, _object){
     function append(items){
         component.reset()
 
+        if(get_links_wait) component.append($('<div class="broadcast__scan"><div></div></div>'))
+
         let viewed = Lampa.Storage.cache('online_view', 5000, [])
 
+        let last_episode = component.getLastEpisode(items)
+
         items.forEach(element => {
-            if(element.season) element.title = 'S'+element.season + ' / Серия ' + element.title
+            if(element.season) element.title = 'S'+element.season + ' / ' + Lampa.Lang.translate('torrent_serial_episode') + ' ' + element.title
 
             element.info = element.season ? ' / ' + filter_items.voice[choice.voice] : ''
+
+            if(element.season){
+                element.translate_episode_end = last_episode
+                element.translate_voice       = filter_items.voice[choice.voice]
+            }
 
             let hash = Lampa.Utils.hash(element.season ? [element.season,element.episode,object.movie.original_title].join('') : object.movie.original_title)
             let view = Lampa.Timeline.view(hash)
@@ -478,7 +536,7 @@ function videocdn(component, _object){
                         Lampa.Storage.set('online_view', viewed)
                     }
                 }
-                else Lampa.Noty.show('Не удалось извлечь ссылку')
+                else Lampa.Noty.show(Lampa.Lang.translate(get_links_wait ? 'online_waitlink' : 'online_nolink'))
             })
 
             component.append(item)
@@ -488,6 +546,7 @@ function videocdn(component, _object){
                 view,
                 viewed,
                 hash_file,
+                element,
                 file: (call)=>{call(getFile(element, element.quality ,true))}
             })
         })

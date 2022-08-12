@@ -9,6 +9,7 @@ $media_xm: 480px;
 $media_xs: 385px;
 
 @import 'components/welcome';
+@import 'components/lang';
 @import 'components/main';
 @import 'components/wrap';
 @import 'components/head';
@@ -58,7 +59,9 @@ $media_xs: 385px;
 @import 'components/plugins_catalog';
 @import 'components/broadcast';
 @import 'components/timetable';
+@import 'components/extensions';
 @import 'components/online';
+@import 'components/iframe';
 @import 'components/orsay';
 @import 'components/touch';
 @import 'components/light';

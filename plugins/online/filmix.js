@@ -10,7 +10,8 @@ function filmix(component, _object){
 
     let choice = {
         season: 0,
-        voice: 0
+        voice: 0,
+        voice_name: ''
     }
 
     let token = Lampa.Storage.get('filmix_token','')
@@ -65,7 +66,7 @@ function filmix(component, _object){
                 component.similars(json)
                 component.loading(false)
             }
-            else component.empty('По запросу (' + select_title + ') нет результатов')
+            else component.emptyForQuery(select_title)
         }, (a, c)=> {
             component.empty(network.errorDecode(a, c))
         })
@@ -98,7 +99,7 @@ function filmix(component, _object){
 
                     component.loading(false)
                 }
-                else component.empty('По запросу (' + select_title + ') нет результатов')
+                else component.emptyForQuery(select_title)
             }, function (a, c) {
                 component.empty(network.errorDecode(a, c))
             })
@@ -117,7 +118,8 @@ function filmix(component, _object){
 
         choice = {
             season: 0,
-            voice: 0
+            voice: 0,
+            voice_name: ''
         }
 
         extractData(results)
@@ -137,6 +139,8 @@ function filmix(component, _object){
      */
     this.filter = function(type, a, b){
         choice[a.stype] = b.index
+
+        if(a.stype == 'voice') choice.voice_name = filter_items.voice[b.index]
 
         component.reset()
 
@@ -218,7 +222,7 @@ function filmix(component, _object){
 
                             items.push({
                                 id: seas_num + '_' + epis_num,
-                                comment: epis_num + ' Серия <i>' + ID + '</i>',
+                                comment: epis_num + ' ' + Lampa.Lang.translate('torrent_serial_episode') + ' <i>' + ID + '</i>',
                                 file: stream_url,
                                 episode: epis_num,
                                 season: seas_num,
@@ -235,7 +239,7 @@ function filmix(component, _object){
 
                     extract[transl_id].json.push({
                         id: seas_num,
-                        comment: seas_num + ' сезон',
+                        comment: seas_num + ' ' + Lampa.Lang.translate('torrent_serial_season'),
                         folder: items,
                         translation: transl_id
                     })
@@ -352,7 +356,7 @@ function filmix(component, _object){
             let s = results.last_episode.season
 
             while (s--) {
-                filter_items.season.push('Сезон ' + (results.last_episode.season - s))
+                filter_items.season.push(Lampa.Lang.translate('torrent_serial_season') + ' ' + (results.last_episode.season - s))
             }
         }
 
@@ -374,6 +378,15 @@ function filmix(component, _object){
                         id: d
                     })
                 }
+            }
+        }
+
+        if(choice.voice_name){
+            let inx = filter_items.voice.indexOf(choice.voice_name)
+            
+            if(inx == -1) choice.voice = 0
+            else if(inx !== choice.voice){
+                choice.voice = inx
             }
         }
 
@@ -434,10 +447,17 @@ function filmix(component, _object){
 
         let viewed = Lampa.Storage.cache('online_view', 5000, [])
 
+        let last_episode = component.getLastEpisode(items)
+
         items.forEach(element => {
-            if(element.season) element.title = 'S'+element.season + ' / Серия ' + element.episode
+            if(element.season) element.title = 'S'+element.season + ' / ' + Lampa.Lang.translate('torrent_serial_episode') + ' ' + element.episode
 
             element.info = element.season ? ' / ' + Lampa.Utils.shortText(filter_items.voice[choice.voice], 50) : ''
+
+            if(element.season){
+                element.translate_episode_end = last_episode
+                element.translate_voice       = filter_items.voice[choice.voice]
+            }
 
             let hash = Lampa.Utils.hash(element.season ? [element.season,element.episode,object.movie.original_title].join('') : object.movie.original_title)
             let view = Lampa.Timeline.view(hash)
@@ -501,7 +521,7 @@ function filmix(component, _object){
                         Lampa.Storage.set('online_view', viewed)
                     }
                 }
-                else Lampa.Noty.show('Не удалось извлечь ссылку')
+                else Lampa.Noty.show(Lampa.Lang.translate('online_nolink'))
             })
 
             component.append(item)
@@ -511,6 +531,7 @@ function filmix(component, _object){
                 view,
                 viewed,
                 hash_file,
+                element,
                 file: (call)=>{call(getFile(element, element.quality))}
             })
         })

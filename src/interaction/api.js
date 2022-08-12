@@ -3,6 +3,7 @@ import Favorite from '../utils/favorite'
 import Status from '../utils/status'
 import Utils from '../utils/math'
 import Storage from '../utils/storage'
+import Lang from '../utils/lang'
 
 import TMDB from '../utils/api/tmdb'
 import OKKO from '../utils/api/okko'
@@ -36,7 +37,19 @@ let network = new Reguest()
  * @returns {class}
  */
 function source(params){
-    return params.source ? sources[params.source] : sources.tmdb
+    return params.source && sources[params.source] ? sources[params.source] : sources.tmdb
+}
+
+function availableDiscovery(){
+    let list = []
+
+    for(let key in sources){
+        console.log('Api','discovery check:',key, sources[key].discovery ? true : false, typeof sources[key].discovery)
+
+        if(sources[key].discovery) list.push(sources[key].discovery())
+    }
+
+    return list
 }
 
 /**
@@ -75,39 +88,16 @@ function full(params = {}, oncomplite, onerror){
  * @param {function} oncomplite
  */
 function search(params = {}, oncomplite){
-    let use_parser = Storage.field('parser_use') && Storage.field('parse_in_search')
-
-    let status = new Status(use_parser ? 3 : 2)
-        status.onComplite = oncomplite
-
     TMDB.search(params, (json)=>{
-        if(json.movie) status.append('movie', json.movie)
-        if(json.tv) status.append('tv', json.tv)
-    }, status.error.bind(status))
+        let result = {
+            movie: json.find(a=>a.type == 'movie'),
+            tv: json.find(a=>a.type == 'tv')
+        }
 
-    
-    if(use_parser){
-        PARSER.get({
-            search: decodeURIComponent(params.query),
-            other: true,
-            movie: {
-                genres: [],
-                title: decodeURIComponent(params.query),
-                original_title: decodeURIComponent(params.query),
-                number_of_seasons: 0
-            }
-        },(json)=>{
-            json.title = 'Парсер'
-            json.results = json.Results.slice(0,20)
-            json.Results = null
-
-            json.results.forEach((element)=>{
-                element.Title = Utils.shortText(element.Title,110)
-            })
-
-            status.append('parser', json)
-        },status.error.bind(status))
-    }
+        oncomplite(result)
+    }, ()=>{
+        oncomplite({})
+    })
 }
 
 /**
@@ -252,5 +242,6 @@ export default {
     menu,
     collections,
     menuCategory,
-    sources
+    sources,
+    availableDiscovery
 }

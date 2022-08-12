@@ -1,4 +1,6 @@
 import Define from './utils/define'
+import Manifest from './utils/manifest'
+import Lang from './utils/lang'
 import Platform from './utils/platform'
 import Orsay from './utils/orsay'
 import Render from './interaction/render'
@@ -55,10 +57,15 @@ import InteractionMain from './interaction/items/main'
 import InteractionCategory from './interaction/items/category'
 import InteractionLine from './interaction/items/line'
 import Status from './utils/status'
+import LangChoice from './interaction/lang'
+import Extensions from './interaction/extensions'
+import Iframe from './interaction/iframe'
+import Parser from './utils/api/parser'
 
 
 window.Lampa = {
     Listener: Subscribe(),
+    Lang,
     Subscribe,
     Storage,
     Platform,
@@ -110,14 +117,59 @@ window.Lampa = {
     InteractionLine,
     Status,
     Plugins,
+    Extensions,
     Tizen,
-    Layer
+    Layer,
+    Console,
+    Iframe,
+    Parser,
+    Manifest
 }
 
-Console.init()
+function prepareApp(){
+    if(window.prepared_app) return
+
+    Console.init()
+
+    Keypad.init()
+
+    Layer.init()
+
+    /** Передаем фокус в контроллер */
+
+    Navigator.follow('focus', (event)=>{
+        Controller.focus(event.elem)
+    })
+
+    /** Start - для orsay одни стили, для других другие */
+    let old_css = $('link[href="css/app.css"]')
+
+    if(Platform.is('orsay')){
+        Orsay.init()
+
+        Utils.putStyle([
+            'http://lampa.mx/css/app.css?v' + Manifest.css_version
+        ],()=>{
+            old_css.remove()
+        })
+    }
+    else if(old_css.length){
+        Utils.putStyle([
+            'https://yumata.github.io/lampa/css/app.css?v' + Manifest.css_version
+        ],()=>{
+            old_css.remove()
+        })
+    }
+
+    Layer.update()
+
+    window.prepared_app = true
+}
 
 function startApp(){
     if(window.appready) return
+
+    let start_time = 0
 
     /** Стартуем */
 
@@ -125,8 +177,8 @@ function startApp(){
 
     /** Инициализируем классы */
 
-    Keypad.init()
     Settings.init()
+    Select.init()
     Platform.init()
     Params.init()
     Favorite.init()
@@ -135,11 +187,10 @@ function startApp(){
     Head.init()
     Menu.init()
     Activity.init()
-    if(Platform.is('orsay')){Orsay.init()}
-    Layer.init()
     Screensaver.init()
     Cloud.init()
     Account.init()
+    Extensions.init()
     Plugins.init()
     Socket.init()
     Recomends.init()
@@ -147,6 +198,9 @@ function startApp(){
     TimeTable.init()
     Helper.init()
     Tizen.init()
+    Player.init()
+    Iframe.init()
+    Parser.init()
 
     /** Надо зачиcтить, не хорошо светить пароль ;) */
 
@@ -158,21 +212,30 @@ function startApp(){
         Layer.update()
     })
 
+    /** Чтоб не писали по 100 раз */
+    
+    if(!Storage.get('parser_torrent_type')) Storage.set('parser_torrent_type','torlook')
+
     /** Выход из приложения */
 
+    console.log('App','screen size:', window.innerWidth + 'px / ' + window.innerHeight + 'px')
+    console.log('App','user agent:', navigator.userAgent)
+
     Activity.listener.follow('backward',(event)=>{
-        if(event.count == 1){
+        if(!start_time) start_time = Date.now()
+        
+        if(event.count == 1 && Date.now() > start_time + (1000 * 2)){
             let enabled = Controller.enabled()
 
             Select.show({
-                title: 'Выход',
+                title: Lang.translate('title_out'),
                 items: [
                     {
-                        title: 'Да, выйти',
+                        title: Lang.translate('title_out_confirm'),
                         out: true
                     },
                     {
-                        title: 'Продолжить'
+                        title: Lang.translate('cancel')
                     }
                 ],
                 onSelect: (a)=>{
@@ -198,11 +261,6 @@ function startApp(){
         }
     })
 
-    /** Передаем фокус в контроллер */
-
-    Navigator.follow('focus', (event)=>{
-        Controller.focus(event.elem)
-    })
 
     /** Ренедрим лампу */
 
@@ -230,23 +288,6 @@ function startApp(){
     /** Если это тач дивайс */
 
     if(Utils.isTouchDevice()) $('body').addClass('touch-device')
-
-    /** Start - для orsay одни стили, для других другие */
-
-    if(Platform.is('orsay')){
-        Utils.putStyle([
-            'http://lampa.mx/css/app.css'
-        ],()=>{
-            $('link[href="css/app.css"]').remove()
-        })
-    }
-    else if(window.location.protocol == 'file:'){
-        Utils.putStyle([
-            'https://yumata.github.io/lampa/css/app.css'
-        ],()=>{
-            $('link[href="css/app.css"]').remove()
-        })
-    }
 
     /** End */
 
@@ -325,6 +366,28 @@ function startApp(){
             check(Storage.field('torrserver_use_link') == 'one' ? 'torrserver_url' : 'torrserver_url_two')
         }
         else torrent_net.clear()
+
+        if(e.name == 'interface'){
+            $('.settings-param:eq(0)',e.body).on('hover:enter',()=>{
+                LangChoice.open((code)=>{
+                    Modal.open({
+                        title: '',
+                        html: $('<div class="about"><div class="selector">'+Lang.translate('settings_interface_lang_reload')+'</div></div>'),
+                        onBack: ()=>{
+                            window.location.reload()
+                        },
+                        onSelect: ()=>{
+                            window.location.reload()
+                        }
+                    })
+
+                    Storage.set('language', code, true)
+                    Storage.set('tmdb_lang',code, true)
+                },()=>{
+                    Controller.toggle('settings_component')
+                })
+            }).find('.settings-param__value').text(Lang.translate(Lang.codes()[Storage.get('language','ru')]))
+        }
     })
 
     /** End */
@@ -370,8 +433,14 @@ function startApp(){
             psdg = -1
 
             console.log('God','enabled')
+
+            Noty.show('God enabled')
+
+            window.god_enabled = true
         }
     })
+
+    /** Быстрый доступ к закладкам через кнопки */
 
     let color_keys = {
         '406':'history',
@@ -387,7 +456,7 @@ function startApp(){
                 
                 Activity.push({
                     url: '',
-                    title: type == 'book' ? 'Закладки' : type == 'like' ? 'Нравится' : type == 'history' ? 'История просмотров' : 'Позже',
+                    title: type == 'book' ? Lang.translate('title_book') : type == 'like' ? Lang.translate('title_like'): type == 'history' ? Lang.translate('title_history') : Lang.translate('title_wath'),
                     component: 'favorite',
                     type: type,
                     page: 1
@@ -396,13 +465,64 @@ function startApp(){
         }
     })
 
+    /** Обновление состояния карточек каждые 5 минут */
+    
+    let last_card_update = Date.now()
+    let lets_card_update = ()=>{
+        if(last_card_update < Date.now() - 1000 * 60 * 5){
+            last_card_update = Date.now()
+
+            Activity.renderLayers().forEach((layer)=>{
+                $('.card',layer).each(function(){
+                    let update = $(this).data('update')
+                
+                    if(typeof update == 'function') update()
+                })
+            })
+        }
+    }
+    
+    setInterval(()=>{
+        if(!Player.opened()) lets_card_update()
+    },1000 * 60)
+
+    Player.listener.follow('destroy',()=>{
+        setTimeout(lets_card_update, 1000)
+    })
+
+    Lampa.Listener.follow('activity',(e)=>{
+        if(e.type == 'archive' && e.object.activity){
+            let update = $('.card.focus',e.object.activity.render()).eq(0).data('update')
+            
+            if(typeof update == 'function') update()
+        }
+    })
+    
     /** End */
 }
 
-/** Принудительно стартовать */
+prepareApp()
 
-setTimeout(startApp,1000*5)
+if(Storage.get('language')){
+    /** Принудительно стартовать */
 
-/** Загружаем плагины и стартуем лампу */
+    setTimeout(startApp,1000*5)
 
-Plugins.load(startApp)
+    /** Загружаем плагины и стартуем лампу */
+
+    Plugins.load(startApp)
+}
+else{
+    LangChoice.open((code)=>{
+        Storage.set('language', code, true)
+        Storage.set('tmdb_lang',code, true)
+
+        Keypad.disable()
+
+        setTimeout(startApp,1000*5)
+
+        Plugins.load(startApp)
+    })
+
+    Keypad.enable()
+}

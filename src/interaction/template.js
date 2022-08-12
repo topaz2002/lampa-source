@@ -1,3 +1,5 @@
+import Lang from '../utils/lang'
+
 import head from '../templates/head'
 import wrap from '../templates/wrap'
 import menu from '../templates/menu'
@@ -62,6 +64,11 @@ import list_empty from '../templates/list_empty'
 import screensaver from "../templates/screensaver";
 import plugins_catalog from "../templates/plugins_catalog";
 import broadcast from "../templates/broadcast";
+import lang_choice from '../templates/lang'
+import extensions from '../templates/extensions/main'
+import extensions_block from '../templates/extensions/block'
+import extensions_item from '../templates/extensions/item'
+import iframe from '../templates/iframe'
 
 let templates = {
     head,
@@ -127,23 +134,30 @@ let templates = {
     list_empty,
     screensaver,
     plugins_catalog,
-    broadcast
+    broadcast,
+    lang_choice,
+    extensions,
+    extensions_block,
+    extensions_item,
+    iframe
 }
 
 function get(name, vars = {}, like_static = false){
-    var tpl = templates[name];
+    let tpl = templates[name]
 
-    if(!tpl) throw 'Шаблон: '+name+' не найден!'
+    if(!tpl) throw 'Template ['+name+'] not found'
 
-    for(var n in vars){
-        tpl = tpl.replace(new RegExp('{'+n+'}','g'),vars[n]);
+    tpl = Lang.translate(tpl)
+
+    for(let n in vars){
+        tpl = tpl.replace(new RegExp('{'+n+'}','g'),vars[n])
     }
 
     tpl = tpl.replace(/{\@([a-z_-]+)}/g, function(e,s){
-        return templates[s] || '';
+        return templates[s] || ''
     })
 
-    return like_static ? tpl : $(tpl);
+    return like_static ? tpl : $(tpl)
 }
 
 function add(name, html){
