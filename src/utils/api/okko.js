@@ -9,12 +9,12 @@ let network   = new Reguest()
 let menu_list = []
 
 
-function img(element, need = 'PORTRAIT'){
+function img(element, need = 'PORTRAIT', size){
     if(element.basicCovers && element.basicCovers.items.length){
         for (let index = 0; index < element.basicCovers.items.length; index++) {
             const img = element.basicCovers.items[index]
             
-            if(img.imageType == need) return prox + img.url + '?width='+(need == 'COVER' ? 800 : 300)+'&scale=1&quality=80&mediaType=jpeg'
+            if(img.imageType == need) return prox + img.url + '?width='+(size ? size : (need == 'COVER' ? 800 : 300))+'&scale=1&quality=80&mediaType=jpeg'
         }
 
         return prox + element.basicCovers.items[0].url + '?width=500&scale=1&quality=80&mediaType=jpeg'
@@ -432,7 +432,9 @@ function full(params, oncomplite, onerror){
                 number_of_seasons: seasonsCount(element).seasons,
                 number_of_episodes: seasonsCount(element).episodes,
                 seasons: seasonsDetails(element),
-                first_air_date: element.type == 'SERIAL' ? date(element) : ''
+                first_air_date: element.type == 'SERIAL' ? date(element) : '',
+                restrict: parseInt(element.ageAccessType || '0'),
+                background_image: img(element,'COVER',1200)
             }
         }
 
