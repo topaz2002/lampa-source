@@ -14,6 +14,11 @@ import Android from "../../utils/android";
 import Platform from "../../utils/platform";
 import Scroll from '../../interaction/scroll'
 import Lang from '../../utils/lang'
+import VideoQuality from '../../utils/video_quality'
+import Event from '../../utils/event'
+import Noty from '../../interaction/noty'
+import Account from '../../utils/account'
+import Loading from '../../interaction/loading'
 
 function create(data, params = {}){
     let html
@@ -27,15 +32,19 @@ function create(data, params = {}){
         }
     }
 
-    let buttons_scroll  = new Scroll({horizontal: true, nopadding: true})
+    let buttons_scroll = new Scroll({horizontal: true, nopadding: false})
+    let load_images    = {
+        poster: {},
+        background: {}
+    }
 
-    let poster_size  = Storage.field('poster_size')
-    
+    let event = new Event()
+
     Arrays.extend(data.movie,{
         title: data.movie.name,
         original_title: data.movie.original_name,
         runtime: 0,
-        img: data.movie.poster_path ? Api.img(data.movie.poster_path, poster_size) : 'img/img_broken.svg'
+        img: data.movie.poster_path ? Api.img(data.movie.poster_path, Storage.field('poster_size')).replace(/\/w200/,'/w500') : 'img/img_broken.svg'
     })
 
     this.create = function(){
@@ -43,6 +52,7 @@ function create(data, params = {}){
             return Utils.capitalizeFirstLetter(a.name)
         }).join(', ')
 
+        let countries = Api.sources.tmdb.parseCountries(data.movie)
 
         html = Template.get('full_start',{
             title: data.movie.title,
@@ -51,12 +61,39 @@ function create(data, params = {}){
             time: Utils.secondsToTime(data.movie.runtime * 60,true),
             genres: Utils.substr(genres,30),
             r_themovie: parseFloat((data.movie.vote_average || 0) +'').toFixed(1),
-            seasons: data.movie.number_of_seasons,
+            seasons: Utils.countSeasons(data.movie),
+            countries: countries.join(', '),
             episodes: data.movie.number_of_episodes
         })
 
+        let year    = ((data.movie.release_date || data.movie.first_air_date) + '').slice(0,4)
+        let quality = !data.movie.first_air_date ? VideoQuality.get(data.movie) : false
+
+        if(year){
+            html.find('.tag--year').removeClass('hide').find('> div').text(year)
+        }
+
+        if(quality){
+            html.find('.tag--quality').removeClass('hide').find('> div').text(quality)
+        }
+
         if(data.movie.number_of_seasons){
             html.find('.is--serial').removeClass('hide')
+        }
+
+        if(data.movie.imdb_rating){
+            html.find('.rate--imdb').removeClass('hide').find('> div').eq(0).text(data.movie.imdb_rating)
+        }
+
+        if(data.movie.kp_rating){
+            html.find('.rate--kp').removeClass('hide').find('> div').eq(0).text(data.movie.kp_rating)
+        }
+
+        if(!(data.movie.source == 'tmdb' || data.movie.source == 'cub')) html.find('.info__rate').eq(0).find('> div').text(data.movie.source.toUpperCase())
+        else if(data.movie.number_of_seasons){
+            html.find('.icon--subscribe').removeClass('hide')
+
+            this.subscribed()
         }
 
         $('.full-start__buttons-scroll',html).append(buttons_scroll.render())
@@ -102,7 +139,7 @@ function create(data, params = {}){
             })
         })
 
-        html.find('.info__icon').on('hover:enter',(e)=>{
+        html.find('.info__icon').not('[data-type="subscribe"]').on('hover:enter',(e)=>{
             let type = $(e.target).data('type')
 
             params.object.card        = data.movie
@@ -151,76 +188,168 @@ function create(data, params = {}){
             html.find('.view--trailer').remove()
         }
 
-        let img   = html.find('.full-start__img')[0] || {}
-
-        img.onerror = function(e){
-            img.src = './img/img_broken.svg'
-        }
-
-        img.src = data.movie.img
-
-        Background.immediately(Utils.cardImgBackground(data.movie))
-
         Storage.listener.follow('change',follow)
 
         follow({name: 'parser_use'})
 
         this.favorite()
+
+        this.loadPoster()
+
+        this.loadBackground()
+
+        this.translations()
+
+        let pg = Api.sources.tmdb.parsePG(data.movie)
+
+        if(pg) html.find('.full-start__pg').removeClass('hide').text(pg)
+    }
+
+    this.subscribed = function(){
+        event.call('subscribed',{
+            card_id: data.movie.id
+        },(result)=>{
+            if(result.result){
+                html.find('.icon--subscribe').data('voice',result.result).addClass('active')
+            }
+        })
+    }
+
+    this.translations = function(){
+        let button = html.find('.icon--subscribe')
+        
+        button.on('hover:enter',()=>{
+            Loading.start(()=>{
+                event.cancel('translations')
+
+                Loading.stop()
+            })
+
+            event.call('translations',{
+                card_id: data.movie.id,
+                imdb_id: data.movie.imdb_id,
+                season: Utils.countSeasons(data.movie)
+            },(result)=>{
+                Loading.stop()
+                
+                if(!result.result){
+                    result.result = {
+                        voice: {},
+                        subscribe: ''
+                    }
+                }
+
+                let items = []
+                let subscribed = result.result.subscribe || button.data('voice')
+
+                if(subscribed){
+                    items.push({
+                        title: Lang.translate('title_unsubscribe'),
+                        subtitle: subscribed,
+                        unsubscribe: true
+                    })
+                }
+
+                for(let voice in result.result.voice){
+                    items.push({
+                        title: voice + ' - ' + result.result.voice[voice],
+                        voice: voice,
+                        ghost: voice !== result.result.subscribe,
+                        episode: result.result.voice[voice]
+                    })
+                }
+
+                if(items.length){
+                    Select.show({
+                        title: Lang.translate('title_subscribe'),
+                        items: items,
+                        onSelect: (a)=>{
+                            this.toggle()
+
+                            if(a.unsubscribe){
+                                event.call('unsubscribe',{
+                                    card_id: data.movie.id
+                                },(result)=>{
+                                    if(result.result){
+                                        button.removeClass('active').data('voice','')
+                                    }
+                                })
+                            }
+                            else if(Account.working()){
+                                Account.subscribeToTranslation({
+                                    card: data.movie,
+                                    season: Utils.countSeasons(data.movie),
+                                    episode: a.episode,
+                                    voice: a.voice
+                                },()=>{
+                                    Noty.show(Lang.translate('subscribe_success'))
+
+                                    button.addClass('active').data('voice',a.voice)
+                                },()=>{
+                                    Noty.show(Lang.translate('subscribe_error'))
+                                })
+                            }
+                            else{
+                                Account.showNoAccount()
+                            }
+                        },
+                        onBack: ()=>{
+                            Controller.toggle('full_start')
+                        }
+                    })
+                }
+                else Noty.show(Lang.translate('subscribe_noinfo'))
+                
+            })
+        })
+    }
+
+    this.loadPoster = function(){
+        load_images.poster = html.find('.full-start__img')[0] || {}
+
+        load_images.poster.onerror = function(e){
+            load_images.poster.src = './img/img_broken.svg'
+        }
+
+        let poster
+
+        if(window.innerWidth <= 400){
+            if(data.movie.backdrop_path) poster = Api.img(data.movie.backdrop_path,'original')
+            else if(data.movie.background_image) poster = data.movie.background_image
+        }
+
+        if(poster) html.find('.full-start__poster').addClass('background--poster')
+
+        load_images.poster.src = poster || data.movie.img
+    }
+
+    this.loadBackground = function(){
+        let background = data.movie.backdrop_path ? Api.img(data.movie.backdrop_path,'original') : data.movie.background_image ? data.movie.background_image : ''
+
+        if(window.innerWidth > 790 && background && !Storage.field('light_version') && Storage.field('background_type') !== 'poster'){
+            load_images.background = html.find('.full-start__background')[0] || {}
+
+            load_images.background.onload = function(e){
+                html.find('.full-start__background').addClass('loaded')
+            }
+
+            load_images.background.src = background
+        }
+        else html.find('.full-start__background').remove()
     }
 
     this.groupButtons = function(){
-        let buttons = html.find('.full-start__buttons > *').not('.full-start__icons,.info__rate,.open--menu,.view--torrent,.view--trailer')
-        let max     = 2
+        buttons_scroll.render().find('.selector').on('hover:focus',function(){
+            last = $(this)[0]
 
-        if(buttons.length > max){
-            buttons.hide()
-
-            html.find('.open--menu').on('hover:enter',()=>{
-                let enabled = Controller.enabled().name
-
-                let menu  = []
-                let ready = {}
-
-                buttons.each(function(){
-                    let name = $(this).find('span').text()
-
-                    if(ready[name]){
-                        ready[name]++
-
-                        name = name + ' ' + ready[name]
-                    }
-                    else{
-                        ready[name] = 1
-                    }
-
-                    menu.push({
-                        title: name,
-                        subtitle: $(this).data('subtitle'),
-                        btn: $(this)
-                    })
-                })
-
-                Select.show({
-                    title: Lang.translate('title_watch'),
-                    items: menu,
-                    onBack: ()=>{
-                        Controller.toggle(enabled)
-                    },
-                    onSelect: (a)=>{
-                        a.btn.trigger('hover:enter')
-                    }
-                })
-            })
-        }
-        else{
-            html.find('.open--menu').hide()
-        }
+            buttons_scroll.update($(this), false)
+        })
     }
 
     this.favorite = function(){
         let status = Favorite.check(params.object.card)
 
-        $('.info__icon',html).removeClass('active')
+        $('.info__icon',html).not('.icon--subscribe').removeClass('active')
 
         $('.icon--book',html).toggleClass('active',status.book)
         $('.icon--like',html).toggleClass('active',status.like)
@@ -228,18 +357,26 @@ function create(data, params = {}){
     }
 
     this.toggleBackground = function(){
-        Background.immediately(Utils.cardImgBackground(data.movie))
+        let uri = data.movie.poster_path ? Api.img(data.movie.poster_path,'w200') : data.movie.poster || data.movie.img || ''
+        let pos = window.innerWidth > 400 && Storage.field('background_type') == 'poster'
+
+        if(Storage.field('background')){
+            if(data.movie.backdrop_path)                uri = Api.img(data.movie.backdrop_path, pos ? 'w1280' : 'w200')
+            else if(data.movie.background_image && pos) uri = data.movie.background_image
+        }
+
+        if(uri) Background.immediately(uri)
     }
 
     this.toggle = function(){
         Controller.add('full_start',{
             toggle: ()=>{
-                let btns = html.find('.full-start__buttons > *').not('.full-start__icons,.info__rate,.open--menu').filter(function(){
+                let btns = html.find('.full-start__buttons > *').filter(function(){
                     return $(this).is(':visible')
                 })
 
                 Controller.collectionSet(this.render())
-                Controller.collectionFocus(last || (btns.length ? btns.eq(0)[0] : $('.open--menu',html)[0]), this.render())
+                Controller.collectionFocus(last || (btns.length ? btns.eq(0)[0] : false), this.render())
             },
             right: ()=>{
                 Navigator.move('right')
@@ -248,8 +385,19 @@ function create(data, params = {}){
                 if(Navigator.canmove('left')) Navigator.move('left')
                 else Controller.toggle('menu')
             },
-            down:this.onDown,
-            up: this.onUp,
+            down: ()=>{
+                if(Navigator.canmove('down')) Navigator.move('down')
+                else this.onDown()
+            },
+            up: ()=>{
+                let inbuttons = this.render().find('.full-start__buttons .focus').length
+                
+                if(Navigator.canmove('up')) Navigator.move('up')
+                else if(inbuttons) {
+                    Navigator.focus(this.render().find('.full-start__left .selector')[0])
+                }
+                else this.onUp()
+            },
             gone: ()=>{
 
             },
@@ -267,6 +415,11 @@ function create(data, params = {}){
         last = null
 
         buttons_scroll.destroy()
+
+        event.destroy()
+
+        load_images.poster.onerror = ()=>{}
+        load_images.background.onload = ()=>{}
 
         html.remove()
 

@@ -16,7 +16,7 @@ let components = {
 
 function component(object){
     let network = new Reguest()
-    let scroll  = new Scroll({mask:true,over:true})
+    let scroll  = new Scroll({mask:true,over:true,scroll_by_item: true})
     let items   = []
     let active  = 0
 
@@ -128,6 +128,19 @@ function component(object){
                 if(items.length){
                     items[active].toggle()
                 }
+                else{
+                    Controller.collectionSet(scroll.render())
+                    Controller.collectionFocus(false,scroll.render())
+                }
+            },
+            left: ()=>{
+                Controller.toggle('menu')
+            },
+            up: ()=>{
+                Controller.toggle('head')
+            },
+            back: ()=>{
+                Activity.backward()
             }
         })
 

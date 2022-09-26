@@ -2,18 +2,43 @@ import Storage from './storage'
 import Favorite from './favorite'
 import TMDB from './api/tmdb'
 import Arrays from './arrays'
+import Utils from './math'
 
 let data     = []
 let object   = false
+let limit    = 300
+let started  = Date.now()
 
 /**
  * Запуск
  */
 function init(){
-    data = Storage.cache('timetable',300,[])
+    data = Storage.cache('timetable',limit,[])
 
     setInterval(extract,1000*60*2)
     setInterval(favorites,1000*60*10)
+
+    Favorite.listener.follow('add,added',(e)=>{
+        if(e.card.number_of_seasons && e.where !== 'history') update(e.card)
+    })
+
+    Favorite.listener.follow('remove',(e)=>{
+        if(e.card.number_of_seasons && e.method == 'id'){
+            let find = data.find(a=>a.id == e.card.id)
+
+            if(find){
+                find.removed = true
+
+                Storage.set('timetable',data)
+            }
+        }
+    })
+
+    Lampa.Listener.follow('worker_storage',(e)=>{
+        if(e.type == 'insert' && e.name == 'timetable'){
+            data = Storage.get('timetable','[]')
+        } 
+    })
 }
 
 /**
@@ -21,16 +46,21 @@ function init(){
  * @param {[{id:integer,number_of_seasons:integer}]} elems - карточки
  */
 function add(elems){
-    elems.filter(elem=>elem.number_of_seasons).forEach(elem=>{
-        let id = data.filter(a=>a.id == elem.id)
+    if(started + 1000*60*2 > Date.now()) return
 
-        if(!id.length){
+    elems.filter(elem=>elem.number_of_seasons && typeof elem.id == 'number').forEach(elem=>{
+        let find = data.find(a=>a.id == elem.id)
+
+        if(!find){
             data.push({
                 id: elem.id,
                 season: elem.number_of_seasons,
                 episodes: []
             })
-        } 
+        }
+        else{
+            find.removed = Favorite.check(elem).any && !Favorite.check(elem).history ? false : true
+        }
     })
 
     Storage.set('timetable',data)
@@ -45,19 +75,46 @@ function favorites(){
     add(Favorite.get({type: 'wath'}))
 }
 
+function filter(episodes){
+    let filtred = []
+    let fileds  = ['air_date','season_number','episode_number','name','still_path']
+
+    episodes.forEach(episode=>{
+        let item = {}
+
+        fileds.forEach(field=>{
+            if(typeof episode[field] !== 'undefined') item[field] = episode[field]
+        })
+
+        filtred.push(item)
+    })
+
+    /*
+    filtred = filtred.filter(episode=>{
+        let create = new Date(episode.air_date)
+        let today  = new Date()
+            today.setHours(0,0,0,0)
+
+        return create.getTime() >= today.getTime() ? true : false
+    })
+    */
+
+    return filtred
+}
+
 /**
  * Парсим карточку
  */
 function parse(){
-    if(Favorite.check(object).any){
+    if(Favorite.check(object).any  && !Favorite.check(object).history){
         TMDB.get('tv/'+object.id+'/season/'+object.season,{},(ep)=>{
-            object.episodes = ep.episodes
+            object.episodes = filter(ep.episodes)
 
             save()
         },save)
     }
     else{
-        Arrays.remove(data, object) //очистить из расписания если больше нету в закладках
+        object.removed = true //очистить из расписания если больше нету в закладках
 
         save()
     }
@@ -67,7 +124,7 @@ function parse(){
  * Получить карточку для парсинга
  */
 function extract(){
-    let ids = data.filter(e=>!e.scaned && (e.scaned_time || 0) + (60 * 60 * 12 * 1000) < Date.now())
+    let ids = data.filter(e=>!e.scaned && (e.scaned_time || 0) + (60 * 60 * 12 * 1000) < Date.now() && !e.removed)
 
     if(ids.length){
         object = ids[0]
@@ -109,7 +166,7 @@ function get(elem){
  * @param {{id:integer,number_of_seasons:integer}} elem - карточка
  */
 function update(elem){
-    if(elem.number_of_seasons && Favorite.check(elem).any){
+    if(elem.number_of_seasons && Favorite.check(elem).any  && !Favorite.check(elem).history && typeof elem.id == 'number'){
         let id = data.filter(a=>a.id == elem.id)
 
         TMDB.clear()
@@ -117,7 +174,7 @@ function update(elem){
         if(!id.length){
             let item = {
                 id: elem.id,
-                season: elem.number_of_seasons,
+                season: Utils.countSeasons(elem),
                 episodes: []
             }
 

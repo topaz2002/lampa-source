@@ -7,8 +7,8 @@ import Recomends from '../../utils/recomend'
 import Arrays from '../../utils/arrays'
 import VideoQuality from '../video_quality'
 import Lang from '../lang'
-
 import TMDB from './tmdb'
+import TMDBApi from '../tmdb'
 
 let baseurl   = Utils.protocol() + 'tmdb.cub.watch/'
 let network   = new Reguest()
@@ -122,7 +122,8 @@ function category(params = {}, oncomplite, onerror){
 
     if(params.url !== 'tv') total--
 
-    let show     = ['tv','movie'].indexOf(params.url) > -1
+    let show     = ['movie','tv'].indexOf(params.url) > -1 && !params.genres
+    let quality  = ['movie'].indexOf(params.url) > -1 && !params.genres
     let books    = show ? Favorite.continues(params.url) : []
     let recomend = show ? Arrays.shuffle(Recomends.get(params.url)).slice(0,19) : []
 
@@ -154,7 +155,7 @@ function category(params = {}, oncomplite, onerror){
     get('?cat='+params.url+'&sort=now_playing',params,(json)=>{
         append(Lang.translate('title_now_watch'),'s1', json)
 
-        if(show) VideoQuality.add(json.results)
+        if(quality) VideoQuality.add(json.results)
     },status.error.bind(status))
 
     if(params.url == 'tv'){
@@ -166,7 +167,7 @@ function category(params = {}, oncomplite, onerror){
     get('?cat='+params.url+'&sort=top',params,(json)=>{
         append(Lang.translate('title_popular'),'s3', json)
 
-        if(show) VideoQuality.add(json.results)
+        if(quality) VideoQuality.add(json.results)
     },status.error.bind(status))
 
     get('?cat='+params.url+'&sort=latest',params,(json)=>{
@@ -186,11 +187,13 @@ function full(params, oncomplite, onerror){
     let status = new Status(7)
         status.onComplite = oncomplite
 
-    get('3/'+params.method+'/'+params.id+'?api_key=4ef0d7355d9ffb5151e987764708ce96&language='+Storage.field('tmdb_lang'),params,(json)=>{
+    get('3/'+params.method+'/'+params.id+'?api_key='+TMDBApi.key()+'&append_to_response=content_ratings,release_dates&language='+Storage.field('tmdb_lang'),params,(json)=>{
         json.source = 'tmdb'
 
         if(params.method == 'tv'){
-            TMDB.get('tv/'+json.id+'/season/'+json.number_of_seasons,{},(ep)=>{
+            let season = Utils.countSeasons(json)
+
+            TMDB.get('tv/'+json.id+'/season/'+season,{},(ep)=>{
                 status.append('episodes', ep)
             },status.error.bind(status))
         }
@@ -302,7 +305,24 @@ function search(params = {}, oncomplite){
 function discovery(){
     return {
         title: 'CUB',
-        search: search
+        search: search,
+        params: {
+            align_left: true,
+            object: {
+                source: 'cub'
+            }
+        },
+        onMore: (params)=>{
+            Activity.push({
+                url: 'search/' + params.data.type,
+                title: Lang.translate('search') + ' - ' + params.query,
+                component: 'category_full',
+                page: 2,
+                query: encodeURIComponent(params.query),
+                source: 'cub'
+            })
+        },
+        onCancel: network.clear.bind(network)
     }
 }
 

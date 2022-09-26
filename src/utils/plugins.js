@@ -6,6 +6,7 @@ import Account from './account'
 import Lang from './lang'
 import Extensions from '../interaction/extensions'
 import Noty from '../interaction/noty'
+import Base64 from './base64'
 
 let _created = []
 let _loaded  = []
@@ -74,9 +75,27 @@ function load(call){
         
         console.log('Plugins','list:', puts)
 
-        let errors = []
+        let errors   = []
+        let original = {}
+        let include  = []
 
-        Utils.putScript(puts,()=>{
+        puts.forEach(url=>{
+            let encode = url
+            
+            if(!/[0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}/.test(encode)){
+                encode = encode.replace(/\{storage_(\w+|\d+|_|-)\}/g,(match,key)=>{
+                    return encodeURIComponent(Base64.encode(localStorage.getItem(key) || ''))
+                })
+
+                encode = Utils.addUrlComponent(encode, 'email='+encodeURIComponent(Base64.encode(localStorage.getItem('account_email') || '')))
+            }
+            
+            include.push(encode)
+
+            original[encode] = url
+        })
+
+        Utils.putScript(include,()=>{
             call()
 
             if(errors.length){
@@ -85,10 +104,16 @@ function load(call){
                 },2000)
             }
         },(u)=>{
-            if(u.indexOf('modification.js') == -1) errors.push(u)
+            if(u.indexOf('modification.js') == -1){
+                console.log('Plugins','error:', original[u])
+
+                errors.push(original[u])
+            }
         },(u)=>{
-            _created.push(u)
-        })
+            console.log('Plugins','include:', original[u])
+
+            _created.push(original[u])
+        },false)
     })
 }
 

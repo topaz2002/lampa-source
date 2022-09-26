@@ -55,7 +55,7 @@ function init(){
     html.append(Info.render())
 
     html.on('mousemove',()=>{
-        if(Storage.field('navigation_type') == 'mouse') Panel.mousemove()
+        if(Storage.field('navigation_type') == 'mouse' && !Utils.isTouchDevice()) Panel.mousemove()
     })
 
     /** Следим за обновлением времени */
@@ -149,7 +149,7 @@ function init(){
 
     /** Сбросить (продолжить) */
     Video.listener.follow('reset_continue', (e)=>{
-        if(work && work.timeline) work.timeline.continued = false
+        if(work && work.timeline && !work.timeline.continued_bloc) work.timeline.continued = false
     })
 
     /** Перемотка мышкой */
@@ -246,7 +246,10 @@ function init(){
 
         Video.url(e.url)
 
-        if(work && work.timeline) work.timeline.continued = false
+        if(work && work.timeline){
+            work.timeline.continued = false
+            work.timeline.continued_bloc = false
+        } 
     })
 
     /** Нажали на кнопку (отправить) */
@@ -272,7 +275,7 @@ function init(){
 
             Video.setParams(params)
 
-            if(e.item.url.indexOf(Torserver.ip()) > -1) Info.set('stat',e.item.url)
+            if(Torserver.ip() && e.item.url.indexOf(Torserver.ip()) > -1) Info.set('stat',e.item.url)
 
             Panel.showNextEpisodeName({playlist: e.playlist, position: e.position})
         }
@@ -490,7 +493,7 @@ function runWebOS(params){
  * @param {Function} call 
  */
 function preload(data, call){
-    if(data.url.indexOf(Torserver.ip()) > -1 && data.url.indexOf('&preload') > -1){
+    if(Torserver.ip() && data.url.indexOf(Torserver.ip()) > -1 && data.url.indexOf('&preload') > -1){
         preloader.wait = true
 
         Info.set('name',data.title)
@@ -537,6 +540,7 @@ function ask(){
                 ],
                 onBack: ()=>{
                     work.timeline.continued = true
+                    work.timeline.continued_bloc = true
 
                     toggle()
 
@@ -545,7 +549,10 @@ function ask(){
                 onSelect: (a)=>{
                     work.timeline.waiting_for_user = false
 
-                    if(!a.yes) work.timeline.continued = true
+                    if(!a.yes){
+                        work.timeline.continued = true
+                        work.timeline.continued_bloc = true
+                    } 
 
                     toggle()
 
@@ -557,6 +564,7 @@ function ask(){
 
             timer_ask = setTimeout(()=>{
                 work.timeline.continued = true
+                work.timeline.continued_bloc = true
 
                 Select.hide()
                 
@@ -651,7 +659,7 @@ function play(data){
 
         Android.openPlayer(data.url, data)
     }
-    else if(Platform.is('nw') && Storage.field('player') == 'other'){
+    else if(Platform.desktop() && Storage.field('player') == 'other'){
         let path = Storage.field('player_nw_path')
         let file = require('fs')
 

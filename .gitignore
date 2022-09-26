@@ -5,6 +5,8 @@ dest/
 plugins/clear
 plugins/anime
 plugins/strawberry
+plugins/trailers
+plugins/quality
 index/
 node_modules/
 svg/

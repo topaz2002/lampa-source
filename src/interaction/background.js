@@ -30,6 +30,8 @@ let bokeh  = {
 }
 let timer
 let timer_resize
+let timer_change
+let immed_time = Date.now()
 
 
 /**
@@ -64,7 +66,11 @@ function init(){
  * @returns {{canvas:object, ctx: class}}
  */
 function bg(){
-    html.find('canvas').removeClass('visible');
+    clearTimeout(timer_change)
+
+    timer_change = setTimeout(()=>{
+        html.find('canvas').eq(view == 'one' ? 1 : 0).removeClass('visible')
+    },400)
 
     view = view == 'one' ? 'two' : 'one';
 
@@ -256,13 +262,15 @@ function change(url = ''){
  * @param {string} url
  */
 function immediately(url = ''){
-    if(Storage.field('light_version')) return
+    if(Storage.field('light_version') || immed_time + 1000 > Date.now()) return
 
     if(url) src = url
 
     clearTimeout(timer)
 
     bokeh.d = false
+
+    immed_time = Date.now()
 
     if(url) load()
     else draw(false, false, true)

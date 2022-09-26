@@ -45,14 +45,16 @@ function component(object){
 
             object.page++
 
-            Api.list(object,(result)=>{
+            this.nextPageReuest(object,(result)=>{
                 this.append(result, true)
 
                 waitload = false
-
-                //Controller.enable('content')
             },()=>{})
         }
+    }
+
+    this.nextPageReuest = function(object, resolve, reject){
+        Api.list(object,resolve.bind(this), reject.bind(this))
     }
 
     this.append = function(data, append){
@@ -108,7 +110,7 @@ function component(object){
                 html.append(scroll.render())
             }
             else{
-                info = new Info()
+                info = new Info(object)
 
                 info.create()
 
@@ -175,6 +177,8 @@ function component(object){
     this.start = function(){
         Controller.add('content',{
             toggle: ()=>{
+                if(this.activity.canRefresh()) return false
+
                 Controller.collectionSet(scroll.render())
                 Controller.collectionFocus(last || false,scroll.render())
             },
@@ -198,6 +202,12 @@ function component(object){
         })
 
         Controller.toggle('content')
+    }
+
+    this.refresh = function(){
+        this.activity.loader(true)
+        
+        this.activity.need_refresh = true
     }
 
     this.pause = function(){

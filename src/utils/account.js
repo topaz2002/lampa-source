@@ -9,10 +9,17 @@ import Favorite from './favorite'
 import Arrays from './arrays'
 import Socket from './socket'
 import Lang from './lang'
+import Subscribe from './subscribe'
+import Modal from '../interaction/modal'
+import Template from '../interaction/template'
+import Workers from './storage_workers'
+import Head from '../components/head'
+import Loading from '../interaction/loading'
 
 let body
 let network   = new Reguest()
 let api       = Utils.protocol() + 'cub.watch/api/'
+let listener  = Subscribe()
 
 let notice_load = {
     time: 0,
@@ -20,6 +27,7 @@ let notice_load = {
 }
 
 let bookmarks = []
+
 
 /**
  * Запуск
@@ -43,6 +51,8 @@ function init(){
 
             if(e.name == 'account_password') Storage.set('account_password','',true)
         }
+
+        if(e.name == 'account') updateProfileIcon()
     })
 
     Favorite.listener.follow('add,added',(e)=>{
@@ -50,7 +60,11 @@ function init(){
     })
 
     Favorite.listener.follow('remove',(e)=>{
-        save('remove', e.where, e.card)
+        if(e.method == 'id') save('remove', e.where, e.card)
+    })
+
+    Head.render().find('.head__body .open--profile').on('hover:enter',()=>{
+        showProfiles('head')
     })
 
     updateBookmarks(Storage.get('account_bookmarks','[]'))
@@ -58,6 +72,47 @@ function init(){
     update()
 
     timelines()
+
+    storage()
+
+    getUser()
+
+    updateProfileIcon()
+}
+
+function updateProfileIcon(){
+    let account = Storage.get('account','{}')
+    let button  = Head.render().find('.head__body .open--profile').toggleClass('hide', !Boolean(account.token))
+
+    if(account.token){
+        let img = button.find('img')[0]
+
+        img.onerror = ()=>{
+            img.src = './img/img_load.svg'
+        }
+
+        img.src = 'https://cub.watch/img/profiles/' + (account.profile.icon || 'f_1') + '.png'
+    }
+}
+
+function getUser(){
+    let account = Storage.get('account','{}')
+
+    if(account.token && Storage.field('account_use')){
+        network.silent(api + 'users/get',(result)=>{
+            Storage.set('account_user',JSON.stringify(result.user))
+        },false,false,{
+            headers: {
+                token: account.token
+            }
+        })
+    }
+}
+
+function hasPremium(){
+    let user = Storage.get('account_user','{}')
+
+    return user.id ? Utils.countDays(Date.now(), user.premium) : 0
 }
 
 function timelines(){
@@ -88,6 +143,14 @@ function timelines(){
                 profile: account.profile.id
             }
         })
+    }
+}
+
+function storage(){
+    for(let key in Workers){
+        let worker = new Workers[key](key)
+        
+        worker.init()
     }
 }
 
@@ -264,6 +327,12 @@ function renderPanel(){
         
         body.find('.settings--account-signin').toggleClass('hide',signed)
         body.find('.settings--account-user').toggleClass('hide',!signed)
+        body.find('.settings--account-premium').toggleClass('selectbox-item--checked',Boolean(hasPremium()))
+        body.find('.settings-param__label').toggleClass('hide',!Boolean(hasPremium()))
+
+        if(!hasPremium()){
+            body.find('.selectbox-item').on('hover:enter',showCubPremium)
+        }
 
         if(account.token){
             body.find('.settings--account-user-info .settings-param__value').text(account.email)
@@ -301,6 +370,10 @@ function renderPanel(){
                             var formData = new FormData($('<form></form>')[0])
                                 formData.append("file", file, "bookmarks.json")
 
+                            let loader = $('<div class="broadcast__scan" style="margin: 1em 0 0 0"><div></div></div>')
+
+                            body.find('.settings--account-user-sync').append(loader)
+
                             $.ajax({
                                 url: api + 'bookmarks/sync',
                                 type: 'POST',
@@ -319,7 +392,14 @@ function renderPanel(){
                                         Noty.show(Lang.translate('account_sync_secuses'))
 
                                         update()
+
+                                        loader.remove()
                                     } 
+                                },
+                                error: function(){
+                                    Noty.show(Lang.translate('account_export_fail'))
+
+                                    loader.remove()
                                 }
                             })
                         }
@@ -353,25 +433,40 @@ function profile(){
 function showProfiles(controller){
     let account = Storage.get('account','{}')
 
+    Loading.start(()=>{
+        network.clear()
+
+        Loading.stop()
+    })
+
     network.clear()
 
     network.silent(api + 'profiles/all',(result)=>{
+        Loading.stop()
+
         if(result.secuses){
+            let items = Arrays.clone(result.profiles)
+
             Select.show({
                 title: Lang.translate('account_profiles'),
-                items: result.profiles.map((elem)=>{
-                    elem.title = elem.name
+                items: items.map((elem, index)=>{
+                    elem.title    = elem.name
+                    elem.template = 'selectbox_icon'
+                    elem.icon     = '<img src="https://cub.watch/img/profiles/'+elem.icon+'.png" />'
+                    elem.index    = index
 
                     elem.selected = account.profile.id == elem.id
 
                     return elem
                 }),
                 onSelect: (a)=>{
-                    account.profile = a
+                    account.profile = result.profiles[a.index]
 
                     Storage.set('account',account)
 
                     if(body) body.find('.settings--account-user-profile .settings-param__value').text(a.name)
+
+                    notice_load.time = 0
 
                     Controller.toggle(controller)
 
@@ -386,6 +481,8 @@ function showProfiles(controller){
             Noty.show(result.text)
         }
     },()=>{
+        Loading.stop()
+        
         Noty.show(Lang.translate('account_profiles_empty'))
     },false,{
         headers: {
@@ -409,6 +506,10 @@ function working(){
     return Storage.get('account','{}').token && Storage.field('account_use')
 }
 
+function canSync(){
+    return working() ? Storage.get('account','{}') : false
+}
+
 function get(params){
     return bookmarks.filter(elem=>elem.type == params.type).map((elem)=>{
         return elem.data
@@ -429,14 +530,16 @@ function updateBookmarks(rows){
 
         return elem
     })
+
+    listener.send('update_bookmarks',{rows, bookmarks})
 }
 
 /**
  * Проверка авторизации
  */
 function signin(){
-    let email    = Storage.value('account_email','')
-    let password = Storage.value('account_password','')
+    let email    = (Storage.value('account_email','') + '').trim()
+    let password = (Storage.value('account_password','') + '').trim()
 
     if(email && password){
         network.clear()
@@ -456,6 +559,8 @@ function signin(){
                 Settings.update()
 
                 update()
+
+                getUser()
             }
             else{
                 renderStatus(Lang.translate('title_error'),result.text)
@@ -490,7 +595,8 @@ function notice(call){
                 call([])
             },false,{
                 headers: {
-                    token: account.token
+                    token: account.token,
+                    profile: account.profile.id
                 }
             })
         }
@@ -554,6 +660,10 @@ function backup(){
                                 var formData = new FormData($('<form></form>')[0])
                                     formData.append("file", file, "backup.json")
 
+                                let loader = $('<div class="broadcast__scan" style="margin: 1em 0 0 0"><div></div></div>')
+
+                                body.find('.settings--account-user-backup').append(loader)
+
                                 $.ajax({
                                     url: api + 'users/backup/export',
                                     type: 'POST',
@@ -568,11 +678,17 @@ function backup(){
                                     },
                                     success: function (j) {
                                         if(j.secuses){
-                                            Noty.show(Lang.translate('account_export_secuses'))
-                                        } 
+                                            if(j.limited) showLimitedAccount()
+                                            else Noty.show(Lang.translate('account_export_secuses'))
+                                        }
+                                        else Noty.show(Lang.translate('account_export_fail'))
+
+                                        loader.remove()
                                     },
                                     error: function(){
                                         Noty.show(Lang.translate('account_export_fail'))
+
+                                        loader.remove()
                                     }
                                 })
                             }
@@ -622,14 +738,71 @@ function backup(){
     }
 }
 
-function subscribeToTranslation(params = {}, call, error){
-    let account = Storage.get('account','{}')
+function subscribes(params, secuses, error){
+    let account = canSync()
 
-    if(account.token && params.voice){
+    if(account){
+        network.silent(api + 'notifications/all',(result)=>{
+            secuses({
+                results: result.notifications.map(r=> Arrays.decodeJson(r.card,{}))
+            })
+        },error,false,{
+            headers: {
+                token: account.token,
+                profile: account.profile.id
+            }
+        })
+    }
+    else error()
+}
+
+function showModal(template_name){
+    let enabled = Controller.enabled().name
+
+    Modal.open({
+        title: '',
+        html: Template.get(template_name),
+        onBack: ()=>{
+            Modal.close()
+
+            Controller.toggle(enabled)
+        }
+    })
+}
+
+function showNoAccount(){
+    showModal('account')
+}
+
+function showLimitedAccount(){
+    showModal('account_limited')
+}
+
+function showCubPremium(){
+    let enabled = Controller.enabled().name
+
+    Modal.open({
+        title: '',
+        html: Template.get('cub_premium'),
+        onBack: ()=>{
+            Modal.close()
+
+            Controller.toggle(enabled)
+        }
+    })
+
+    Modal.render().addClass('modal--cub-premium').find('.modal__content').before('<div class="modal__icon"><svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 32 32"><path d="m2.837 20.977q-.912-5.931-1.825-11.862a.99.99 0 0 1 1.572-.942l5.686 4.264a1.358 1.358 0 0 0 1.945-.333l4.734-7.104a1.263 1.263 0 0 1 2.1 0l4.734 7.1a1.358 1.358 0 0 0 1.945.333l5.686-4.264a.99.99 0 0 1 1.572.942q-.913 5.931-1.825 11.862z" fill="#D8C39A"></svg></div>')
+}
+
+function subscribeToTranslation(params = {}, call, error){
+    let account = canSync()
+
+    if(account && params.voice){
         network.timeout(5000)
 
-        network.silent(api + 'notifications/add',()=>{
-            if(call) call()
+        network.silent(api + 'notifications/add',(result)=>{
+            if(result.limited) showLimitedAccount()
+            else if(call) call()
         },()=>{
             if(error) error()
         },{
@@ -647,8 +820,10 @@ function subscribeToTranslation(params = {}, call, error){
 }
 
 export default {
+    listener,
     init,
     working,
+    canSync,
     get,
     all,
     plugins,
@@ -662,5 +837,10 @@ export default {
     network,
     backup,
     extensions,
-    subscribeToTranslation
+    subscribeToTranslation,
+    subscribes,
+    showNoAccount,
+    showCubPremium,
+    showLimitedAccount,
+    hasPremium
 }

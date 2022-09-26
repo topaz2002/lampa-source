@@ -14,16 +14,14 @@ function create(data, params = {}){
         html = Template.get('items_line',{title: Lang.translate('full_detail')})
 
         let genres = data.movie.genres.map(a => {
-            return '<div class="full-descr__tag selector" data-genre="'+a.id+'" data-url="'+a.url+'">'+a.name+'</div>'
+            return '<div class="full-descr__tag selector" data-genre="'+a.id+'" data-url="'+a.url+'">'+Utils.capitalizeFirstLetter(a.name)+'</div>'
         }).join('')
 
         let companies = data.movie.production_companies.map(a => {
-            return '<div class="full-descr__tag selector" data-company="'+a.id+'">'+a.name+'</div>'
+            return '<div class="full-descr__tag selector" data-company="'+a.id+'">'+Utils.capitalizeFirstLetter(a.name)+'</div>'
         }).join('')
-
-        let countries = data.movie.production_countries.map(a => {
-            return a.name
-        }).join(', ')
+        
+        let countries = Api.sources.tmdb.parseCountries(data.movie)
 
         body = Template.get('full_descr',{
             text: (data.movie.overview || Lang.translate('full_notext')) + '<br><br>',
@@ -31,11 +29,13 @@ function create(data, params = {}){
             companies: companies,
             relise: (data.movie.release_date || data.movie.first_air_date),
             budget: '$ ' + Utils.numberWithSpaces(data.movie.budget || 0),
-            countries: countries
+            countries: countries.join(', ')
         })
 
         if(!genres)    $('.full--genres', body).remove()
         if(!companies) $('.full--companies', body).remove()
+        if(!data.movie.budget) $('.full--budget', body).remove()
+        if(!countries.length) $('.full--countries', body).remove()
 
         body.find('.selector').on('hover:enter',(e)=>{
             let item = $(e.target)

@@ -46,7 +46,7 @@ function component(object){
             }
         }
         else{
-            info = new Info()
+            info = new Info(object)
 
             info.create()
 
@@ -61,6 +61,8 @@ function component(object){
         this.activity.loader(false)
 
         this.activity.toggle()
+
+        this.show()
     }
 
     this.append = function(element){
@@ -82,6 +84,8 @@ function component(object){
         item.onDown  = this.down.bind(this)
         item.onUp    = this.up.bind(this)
         item.onBack  = this.back.bind(this)
+
+        if(this.onMore) item.onMore = this.onMore.bind(this)
 
         if(info){
             item.onFocus     = info.update
@@ -147,19 +151,47 @@ function component(object){
         scroll.update(items[active].render())
     }
 
+    this.show = function(){
+        if(items.length){
+            this.detach()
+        }
+    }
+
     this.start = function(){
         Controller.add('content',{
             toggle: ()=>{
+                if(this.activity.canRefresh()) return false
+
                 if(items.length){
                     this.detach()
 
                     items[active].toggle()
                 }
             },
+            left: ()=>{
+                if(Navigator.canmove('left')) Navigator.move('left')
+                else Controller.toggle('menu')
+            },
+            right: ()=>{
+                Navigator.move('right')
+            },
+            up: ()=>{
+                if(Navigator.canmove('up')) Navigator.move('up')
+                else Controller.toggle('head')
+            },
+            down: ()=>{
+                if(Navigator.canmove('down')) Navigator.move('down')
+            },
             back: this.back
         })
 
         Controller.toggle('content')
+    }
+
+    this.refresh = function(){
+        this.activity.loader(true)
+        
+        this.activity.need_refresh = true
     }
 
     this.pause = function(){

@@ -13,6 +13,7 @@ import settings_parser from '../templates/settings/parser'
 import settings_server from '../templates/settings/server'
 import settings_player from '../templates/settings/player'
 import settings_more from '../templates/settings/more'
+import settings_tmdb from '../templates/settings/tmdb'
 import settings_plugins from '../templates/settings/plugins'
 import settings_cloud from '../templates/settings/cloud'
 import settings_account from '../templates/settings/account'
@@ -31,6 +32,7 @@ import player_video from '../templates/player/video'
 import player_info from '../templates/player/info'
 import selectbox from '../templates/selectbox/box'
 import selectbox_item from '../templates/selectbox/item'
+import selectbox_icon from '../templates/selectbox/icon'
 import info from '../templates/info'
 import filter from '../templates/filter'
 import more from '../templates/more'
@@ -69,6 +71,10 @@ import extensions from '../templates/extensions/main'
 import extensions_block from '../templates/extensions/block'
 import extensions_item from '../templates/extensions/item'
 import iframe from '../templates/iframe'
+import account from '../templates/account'
+import account_limited from '../templates/account_limited'
+import cub_premium from '../templates/cub_premium'
+import cub_premium_modal from '../templates/cub_premium_modal'
 
 let templates = {
     head,
@@ -83,6 +89,7 @@ let templates = {
     settings_server,
     settings_player,
     settings_more,
+    settings_tmdb,
     settings_plugins,
     settings_cloud,
     settings_account,
@@ -139,7 +146,12 @@ let templates = {
     extensions,
     extensions_block,
     extensions_item,
-    iframe
+    iframe,
+    account,
+    account_limited,
+    cub_premium,
+    cub_premium_modal,
+    selectbox_icon
 }
 
 function get(name, vars = {}, like_static = false){

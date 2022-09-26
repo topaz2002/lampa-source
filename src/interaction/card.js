@@ -11,6 +11,7 @@ import VideoQuality from '../utils/video_quality'
 import Timetable from '../utils/timetable'
 import Timeline from './timeline'
 import Lang from '../utils/lang'
+import Tmdb from '../utils/tmdb'
 
 /**
  * Карточка
@@ -78,6 +79,12 @@ function Card(data, params = {}){
             this.card.find('.card__age').remove()
         }
 
+        if(Storage.field('light_version')){
+            let vote = parseFloat((data.vote_average || 0) + '').toFixed(1)
+
+            if(vote > 0 )this.card.find('.card__view').append('<div class="card__vote">'+vote+'</div>')
+        }
+
         this.card.data('update',this.update.bind(this))
 
         this.update()
@@ -92,6 +99,8 @@ function Card(data, params = {}){
         }
     
         this.img.onerror = ()=>{
+            Tmdb.broken()
+
             this.img.src = './img/img_broken.svg'
         }
     }
@@ -108,7 +117,7 @@ function Card(data, params = {}){
      * Обносить состояние карточки
      */
     this.update = function(){
-        let quality = VideoQuality.get(data)
+        let quality = data.quality || (!data.first_air_date && Storage.field('card_quality') ? VideoQuality.get(data) : false)
 
         this.card.find('.card__quality,.card-watched,.card__new-episode').remove()
 
@@ -139,6 +148,8 @@ function Card(data, params = {}){
      * Какие серии просмотрено
      */
     this.watched = function(){
+        if(!Storage.field('card_episodes')) return
+
         if(!this.watched_checked){
             let episodes = Timetable.get(data)
             let viewed
@@ -267,10 +278,11 @@ function Card(data, params = {}){
     this.visible = function(){
         if(this.visibled) return
 
-        if(data.poster_path) this.img.src = Api.img(data.poster_path)
-        else if(data.poster) this.img.src = data.poster
-        else if(data.img)    this.img.src = data.img
-        else this.img.src = './img/img_broken.svg'
+        if(params.card_wide && data.backdrop_path) this.img.src = Api.img(data.backdrop_path, 'w500')
+        else if(data.poster_path) this.img.src = Api.img(data.poster_path)
+        else if(data.poster)      this.img.src = data.poster
+        else if(data.img)         this.img.src = data.img
+        else                      this.img.src = './img/img_broken.svg'
 
         this.visibled = true
     }

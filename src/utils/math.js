@@ -168,8 +168,10 @@ function strToTime(str){
 
 function checkHttp(url){
     url = url + ''
-    url = url.replace(/https:\/\//,'')
-    url = url.replace(/http:\/\//,'')
+    //url = url.replace(/https:\/\//,'')
+    //url = url.replace(/http:\/\//,'')
+
+    if (url.indexOf("http://") == 0 || url.indexOf("https://") == 0) return url
 
     url = protocol() + url
 
@@ -200,32 +202,33 @@ function addUrlComponent (url, params){
     return url + (/\?/.test(url) ? '&' : '?') + params;
 }
 
-function putScript(items, complite, error, success){
-    var p = 0;
+function putScript(items, complite, error, success, show_logs){
+    let p = 0;
+    let l = typeof show_logs !== 'undefined' ? show_logs : true;
     
     function next(){
         if(p >= items.length) return complite()
 
-        var u = items[p]
+        let u = items[p]
 
         if(!u){
             p++
 
             return next()
-        } 
+        }
 
-        console.log('Script','create:',u)
+        if(l) console.log('Script','create:',u)
 
-        var s = document.createElement('script')
+        let s = document.createElement('script')
             s.onload = ()=>{
-                console.log('Script','include:',u)
+                if(l) console.log('Script','include:',u)
 
                 if(success) success(u)
 
                 next()
             }
             s.onerror = ()=>{
-                console.log('Script','error:',u)
+                if(l) console.log('Script','error:',u)
 
                 if(error) error(u)
 
@@ -284,8 +287,13 @@ function clearTitle(title){
 
 function cardImgBackground(card_data){
     if(Storage.field('background')){
-        return Storage.get('background_type','complex') == 'poster' && card_data.backdrop_path ? Api.img(card_data.backdrop_path,'original') : card_data.poster_path ? Api.img(card_data.poster_path) : card_data.poster || card_data.img || ''
+        if(Storage.get('background_type','complex') == 'poster' && window.innerWidth > 790){
+            return card_data.backdrop_path ? Api.img(card_data.backdrop_path,'w1280') : card_data.background_image ? card_data.background_image : ''
+        }
+        
+        return card_data.poster_path ? Api.img(card_data.poster_path) : card_data.poster || card_data.img || ''
     }
+
     return ''
 }
 
@@ -382,6 +390,13 @@ function isTouchDevice() {
         (navigator.msMaxTouchPoints > 0));
 }
 
+function canFullScreen(){
+    let doc  = window.document
+    let elem = doc.documentElement
+
+    return elem.requestFullscreen || elem.mozRequestFullScreen || elem.webkitRequestFullScreen || elem.msRequestFullscreen
+}
+
 function toggleFullscreen(){
     let doc  = window.document
     let elem = doc.documentElement
@@ -395,6 +410,54 @@ function toggleFullscreen(){
     else {
         cancelFullScreen.call(doc)
     }
+}
+
+function countSeasons(movie){
+    let seasons = movie.seasons || []
+    let count = 0
+    
+    for(let i = 0; i < seasons.length; i++){
+        if(seasons[i].episode_count > 0) count++
+    }
+
+    if(count > movie.number_of_seasons) count = movie.number_of_seasons
+    
+    return count
+}
+
+function countDays(time_a, time_b){
+    let d1 = new Date(time_a)
+    let d2 = new Date(time_b)
+
+    let days = (d2 - d1) / (1000 * 60 * 60 * 24)
+        days = Math.round(days)
+
+    return days <= 0 ? 0 : days
+}
+
+function decodePG(pg){
+    let lang = Storage.field('language')
+    let keys = {
+        'G': '3+',
+        'PG': '6+',
+        'PG-13': '13+',
+        'R': '17+',
+        'NC-17': '18+',
+        'TV-Y': '0+',
+        'TV-Y7': '7+',
+        'TV-G': '3+',
+        'TV-PG': '6+',
+        'TV-14': '14+',
+        'TV-MA': '17+'
+    } 
+    
+    if(lang == 'ru' || lang == 'uk' || lang == 'be'){
+        for(let key in keys){
+            if(pg == key) return keys[key]
+        }
+    }
+
+    return pg
 }
 
 export default {
@@ -424,5 +487,9 @@ export default {
     copyTextToClipboard,
     imgLoad,
     isTouchDevice,
-    toggleFullscreen
+    toggleFullscreen,
+    canFullScreen,
+    countSeasons,
+    countDays,
+    decodePG
 }

@@ -8,12 +8,15 @@ import Storage from '../../utils/storage'
 import CustomSubs from './subs'
 import Normalization from './normalization'
 import Lang from '../../utils/lang'
+import Panel from './panel'
 
 let listener = Subscribe()
 let html
 let display
 let paused
 let subtitles
+let backworkIcon
+let forwardIcon
 
 let timer           = {}
 let params          = {}
@@ -28,8 +31,12 @@ let neeed_sacle_last
 let neeed_speed
 let webos
 let hls
+let dash
 let webos_wait = {}
 let normalization
+
+let click_nums = 0
+let click_timer
 
 function init(){
     html      = Template.get('player_video')
@@ -37,8 +44,46 @@ function init(){
     paused    = html.find('.player-video__paused')
     subtitles = html.find('.player-video__subtitles')
 
-    html.on('click',()=>{
-        if(Storage.field('navigation_type') == 'mouse') playpause()
+    backworkIcon = html.find('.player-video__backwork-icon')
+    forwardIcon  = html.find('.player-video__forward-icon')
+
+    html.find('.player-video__backwork-icon,.player-video__forward-icon').on('animationend', function () {
+        $(this).removeClass('rewind')
+    })
+
+    html.on('click',(e)=>{
+        
+        if(Storage.field('navigation_type') == 'mouse'){
+            clearTimeout(click_timer)
+            
+            click_nums++
+
+            if (click_nums === 1) {
+                click_timer = setTimeout(() => {
+                    click_nums = 0
+
+                    if(Panel.visibleStatus()) playpause()
+                    else Panel.mousemove()
+                }, 300)
+            }
+            else if (click_nums > 1) {
+                click_timer = setTimeout(() => {
+                    let dir = e.clientX > window.innerWidth / 2 ? 1 : -1
+                    let pow = (click_nums - 1) * 10
+
+                    if(dir == 1){
+                        forwardIcon.addClass('rewind').find('span').text('+' + pow + ' sec')
+                    }
+                    else{
+                        backworkIcon.addClass('rewind').find('span').text('-' + pow + ' sec')
+                    }
+                    
+                    to(video.currentTime + dir * pow)
+
+                    click_nums = 0
+                }, 300)
+            }
+        } 
     })
 
     $(window).on('resize',()=>{
@@ -212,10 +257,18 @@ function bind(){
         $('> div',subtitles).html(e.text ? e.text : '&nbsp;').css({
             display: e.text ? 'inline-block' : 'none'
         })
+
+        clearTimeout(timer.subtitle)
+
+        timer.subtitle = setTimeout(function(){
+            $('> div',subtitles).html('&nbsp;').css({
+                display: 'none'
+            })
+        }, 10000)
     })
 
     //получены первые данные
-    video.addEventListener('loadedmetadata', function (e) {
+    video.addEventListener('loadeddata', function (e) {
         listener.send('videosize',{width: video.videoWidth, height: video.videoHeight})
 
         scale()
@@ -355,6 +408,7 @@ function saveParams(){
     let tracks = []
 
     if(hls && hls.audioTracks && hls.audioTracks.length)   tracks = hls.audioTracks
+    else if(dash)   tracks = dash.getTracksFor('audio')
     else if(video.audioTracks && video.audioTracks.length) tracks = video.audioTracks
 
     if(webos && webos.sourceInfo) tracks = video.webos_tracks || []
@@ -374,6 +428,7 @@ function saveParams(){
     }
 
     if(hls && hls.levels) params.level = hls.currentLevel
+    if(dash) params.level = dash.getQualityFor('video')
 
     console.log('WebOS','saved params', params)
 
@@ -419,7 +474,23 @@ function loaded(){
                 get: ()=>{}
             })
         }) 
-    }   
+    }
+    else if(dash){
+        tracks = dash.getTracksFor('audio')
+
+        tracks.forEach((track,i)=>{
+            if(i == 0) track.selected = true
+
+            track.language = (track.lang + '').replace(/\d+/g,'')
+
+            Object.defineProperty(track, "enabled", {
+                set: (v)=>{
+                    if(v) dash.setCurrentTrack(track)
+                },
+                get: ()=>{}
+            })
+        })
+    }
 	else if(video.audioTracks && video.audioTracks.length) tracks = video.audioTracks
 
     console.log('Player','tracks', video.audioTracks)
@@ -505,6 +576,40 @@ function loaded(){
         } 
 
         listener.send('levels', {levels: hls.levels, current: current_level})
+    }
+
+    if(dash){
+        let bitrates = dash.getBitrateInfoListFor("video"),current_level = 'AUTO'
+        
+        bitrates.forEach((level, i)=>{
+            level.title = level.width ? level.width + 'x' + level.height : 'AUTO'
+
+            if(i == 0) current_level = level.title
+
+            Object.defineProperty(level, "enabled", {
+                set: (v)=>{
+                    if(v){
+                        dash.getSettings().streaming.abr.autoSwitchBitrate = false
+
+                        dash.setQualityFor("video", level.qualityIndex)
+                    } 
+                },
+                get: ()=>{}
+            })
+        })
+
+        if(typeof params.level !== 'undefined' && bitrates[params.level]){
+            bitrates.map(e=>e.selected = false)
+
+            dash.getSettings().streaming.abr.autoSwitchBitrate = false
+
+            bitrates[params.level].enabled = true
+            bitrates[params.level].selected = true
+
+            current_level = bitrates[params.level].title
+        }
+        
+        listener.send('levels', {levels: bitrates, current: current_level})
     }
 }
 
@@ -660,9 +765,28 @@ function loader(status){
         hls = false
     }
 
+    if(dash){
+        dash.destroy()
+        dash = false
+    }
+
     create()
 
-    if(/.m3u8/.test(src) && typeof Hls !== 'undefined'){
+    if(/.mpd/.test(src) && typeof dashjs !== 'undefined'){
+        try{
+            dash = dashjs.MediaPlayer().create()
+
+            dash.getSettings().streaming.abr.autoSwitchBitrate = false
+
+            dash.initialize(video, src, true)
+        }
+        catch(e){
+            console.log('Player','Dash error:', e.stack)
+
+            load(src)
+        }
+    }
+    else if(/.m3u8/.test(src) && typeof Hls !== 'undefined'){
         if(navigator.userAgent.toLowerCase().indexOf('maple') > -1) src += '|COMPONENT=HLS'
 
         if(Storage.field('player_hls_method') == 'application' && video.canPlayType('application/vnd.apple.mpegurl')){
@@ -917,16 +1041,28 @@ function destroy(savemeta){
 
     if(webos) webos.destroy()
 
+    $('> div',subtitles).empty()
+
     webos = null
     webos_wait = {}
 
-    let hls_destoyed = false
+    clearTimeout(click_timer)
+
+    let hls_destoyed  = false
+    let dash_destoyed = false
 
     if(hls){
         hls.destroy()
         hls = false
 
         hls_destoyed = true
+    }
+
+    if(dash){
+        dash.destroy()
+        dash = false
+
+        dash_destoyed = true
     }
 
     if(!savemeta){
@@ -938,7 +1074,7 @@ function destroy(savemeta){
 
     exitFromPIP()
 
-    if(video && !hls_destoyed){
+    if(video && !(hls_destoyed || dash_destoyed)){
         if(video.destroy) video.destroy()
         else{
             video.src = ""

@@ -41,7 +41,7 @@ function init(){
 
         trigger('internal_torrclient', false)
     }
-    else if(Platform.is('nw')){
+    else if(Platform.desktop()){
         select('player',{
             'inner': '#{settings_param_player_inner}',
             'other': '#{settings_param_player_outside}',
@@ -123,7 +123,7 @@ function bind(elems){
 
                 Storage.set(name,value)
 
-                update(elem)
+                update(elem,elems)
 
                 if(onChange) onChange(value)
         }
@@ -136,7 +136,7 @@ function bind(elems){
             },(new_value)=>{
                 Storage.set(name,new_value)
 
-                update(elem)
+                update(elem,elems)
 
                 if(onChange) onChange(new_value)
             })
@@ -184,7 +184,7 @@ function bind(elems){
                 onSelect: (a)=>{
                     Storage.set(name,a.value)
 
-                    update(elem)
+                    update(elem,elems)
 
                     Controller.toggle(enabled)
 
@@ -193,7 +193,7 @@ function bind(elems){
             })
         }
     }).each(function(){
-        if(!$(this).data('static')) update($(this))
+        if(!$(this).data('static')) update($(this),elems)
     })
 
     if(elems.eq(0).data('type') == 'add'){
@@ -241,7 +241,7 @@ function displayAddList(elem){
  * Обновляет значения на элементе
  * @param {object} elem 
  */
-function update(elem){
+function update(elem,elems){
     let name = elem.data('name')
 
     let key = elem.data('string') ? window.localStorage.getItem(name) || defaults[name] : Storage.get(name, defaults[name] + '')
@@ -251,6 +251,14 @@ function update(elem){
     if(!val && plr) val = plr
 
     elem.find('.settings-param__value').text(Lang.translate(val))
+
+    let children = elem.data('children')
+
+    if(children){
+        let parent = elems.filter('[data-parent="'+children+'"]')
+
+        parent.toggleClass('hide',!Storage.field(name))
+    }
 }
 
 /**
@@ -439,12 +447,15 @@ trigger('subtitles_stroke', true)
 trigger('subtitles_backdrop', false)
 trigger('screensaver', true)
 trigger('proxy_tmdb', true)
+trigger('proxy_tmdb_auto', true)
 trigger('proxy_other', true)
 trigger('parse_in_search', false)
 trigger('subtitles_start', false)
 trigger('helper', true)
 trigger('light_version', false)
 trigger('player_normalization', false)
+trigger('card_quality', true)
+trigger('card_episodes', true)
 
 
 
@@ -465,6 +476,8 @@ select('account_email','','')
 select('account_password','','')
 select('device_name','','Lampa')
 select('player_nw_path','','C:/Program Files/VideoLAN/VLC/vlc.exe')
+select('tmdb_proxy_api','','')
+select('tmdb_proxy_image','','')
 
 export default {
     listener,

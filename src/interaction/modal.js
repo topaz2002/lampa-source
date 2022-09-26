@@ -20,9 +20,12 @@ function open(params){
 
     html.toggleClass('modal--medium', params.size == 'medium' ? true : false)
     html.toggleClass('modal--large', params.size == 'large' ? true : false)
+    html.toggleClass('modal--full', params.size == 'full' ? true : false)
     html.toggleClass('modal--overlay', params.overlay ? true : false)
 
     scroll = new Scroll({over: true, mask: params.mask})
+
+    scroll.render().toggleClass('layer--height', params.size == 'full' ? true : false)
 
     html.find('.modal__body').append(scroll.render())
 
@@ -46,7 +49,7 @@ function bind(where){
 }
 
 function jump(tofoward){
-    var select = scroll.render().find('.selector.focus');
+    let select = scroll.render().find('.selector.focus');
 
     if(tofoward) select = select.nextAll().filter('.selector');
     else         select = select.prevAll().filter('.selector');
@@ -59,6 +62,19 @@ function jump(tofoward){
     }
 }
 
+function roll(direction){
+    let select = scroll.render().find('.selector')
+
+    if(select.length){
+        Navigator.move(direction)
+    }
+    else{
+        let step = Math.round(window.innerHeight * 0.15)
+
+        scroll.wheel(direction == 'down' ? step : -step)
+    }
+}
+
 function toggle(){
     Controller.add('modal',{
         invisible: true,
@@ -67,10 +83,10 @@ function toggle(){
             Controller.collectionFocus(last,scroll.render())
         },
         up: ()=>{
-            Navigator.move('up')
+            roll('up')
         },
         down: ()=>{
-            Navigator.move('down')
+            roll('down')
         },
         right: ()=>{
             jump(true)
@@ -116,10 +132,15 @@ function close(){
     destroy()
 }
 
+function render(){
+    return html
+}
+
 export default {
     open,
     close,
     update,
     title,
-    toggle
+    toggle,
+    render
 }

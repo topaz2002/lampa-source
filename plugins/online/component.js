@@ -75,8 +75,6 @@ function component(object){
     this.create = function(){
         this.activity.loader(true)
 
-        Lampa.Background.immediately(Lampa.Utils.cardImgBackground(object.movie))
-
         filter.onSearch = (value)=>{
             Lampa.Activity.replace({
                 search: value,
@@ -162,7 +160,7 @@ function component(object){
                 if(json.data.length == 1 || object.clarification){
                     this.extendChoice()
 
-                    if(balanser == 'videocdn' || balanser == 'filmix') sources[balanser].search(object, json.data)
+                    if(balanser == 'videocdn' || balanser == 'filmix'|| balanser == 'cdnmovies') sources[balanser].search(object, json.data)
                     else sources[balanser].search(object, json.data[0].kp_id || json.data[0].filmId, json.data)
                 }
                 else{
@@ -216,7 +214,10 @@ function component(object){
             letgo(object.movie.imdb_id)
         } 
         else if(object.movie.source == 'tmdb' || object.movie.source == 'cub'){
-            network.native('http://'+(Lampa.Storage.field('proxy_tmdb') === false ? 'api.themoviedb.org' : 'apitmdb.cub.watch')+'/3/' + (object.movie.name ? 'tv' : 'movie') + '/' + object.movie.id + '/external_ids?api_key=4ef0d7355d9ffb5151e987764708ce96&language=ru', function (ttid) {
+            let tmdburl = (object.movie.name ? 'tv' : 'movie') + '/' + object.movie.id + '/external_ids?api_key=4ef0d7355d9ffb5151e987764708ce96&language=ru'
+            let baseurl = typeof Lampa.TMDB !== 'undefined' ? Lampa.TMDB.api(tmdburl) : 'http://api.themoviedb.org' + tmdburl
+
+            network.native(baseurl, function (ttid) {
                 letgo(ttid.imdb_id)
             },(a, c)=>{
                 this.empty(network.errorDecode(a,c))
@@ -269,7 +270,7 @@ function component(object){
 
                 this.extendChoice()
 
-                if(balanser == 'videocdn' || balanser == 'filmix') sources[balanser].search(object, [elem])
+                if(balanser == 'videocdn' || balanser == 'filmix' || balanser == 'cdnmovies') sources[balanser].search(object, [elem])
                 else sources[balanser].search(object, elem.kp_id || elem.filmId, [elem])
             })
 
@@ -593,6 +594,8 @@ function component(object){
             if (object.movie.number_of_seasons && last_views.length) last = last_views.eq(0)[0]
             else last = scroll.render().find('.selector').eq(3)[0]
         }
+
+        Lampa.Background.immediately(Lampa.Utils.cardImgBackground(object.movie))
 
         Lampa.Controller.add('content',{
             toggle: ()=>{
