@@ -42,7 +42,7 @@ function collections(params, oncomplite, onerror){
     let frm = 20 * (params.page - 1)
     let uri = baseurl + 'collection/web/1?elementAlias='+(params.url || 'collections_web')+'&elementType=COLLECTION&limit=20&offset='+frm+'&withInnerCollections=true&includeProductsForUpsale=false&filter=%7B%22sortType%22%3A%22RANK%22%2C%22sortOrder%22%3A%22ASC%22%2C%22useSvodFilter%22%3Afalse%2C%22genres%22%3A%5B%5D%2C%22yearsRange%22%3Anull%2C%22rating%22%3Anull%7D'
         
-    network.native(uri,(json)=>{
+    network.silent(uri,(json)=>{
         let result = {
             results: [],
             total_pages: 0,
@@ -173,7 +173,7 @@ function menu(params, oncomplite){
     if(!menu_list.length){
         network.timeout(1000)
 
-        network.native(baseurl + 'collection/web/1?elementAlias=action&elementType=GENRE&limit=20&offset=0&withInnerCollections=false&includeProductsForUpsale=false&filter=null',(json)=>{
+        network.silent(baseurl + 'collection/web/1?elementAlias=action&elementType=GENRE&limit=20&offset=0&withInnerCollections=false&includeProductsForUpsale=false&filter=null',(json)=>{
             if(json.uiScreenInfo && json.uiScreenInfo.webMain){
                 json.uiScreenInfo.webMain.forEach((element)=>{
                     menu_list.push({
@@ -215,7 +215,7 @@ function videos(element){
 function list(params, oncomplite, onerror){
     let frm = 20 * (params.page - 1)
 
-    network.native(baseurl + 'collection/web/1?elementAlias='+(params.url || params.id)+'&elementType='+(params.type || 'GENRE')+'&limit=20&offset='+frm+'&withInnerCollections=false&includeProductsForUpsale=false&filter=null',(json)=>{
+    network.silent(baseurl + 'collection/web/1?elementAlias='+(params.url || params.id)+'&elementType='+(params.type || 'GENRE')+'&limit=20&offset='+frm+'&withInnerCollections=false&includeProductsForUpsale=false&filter=null',(json)=>{
         let items = []
 
         if(json.element && json.element.collectionItems){
@@ -234,7 +234,7 @@ function list(params, oncomplite, onerror){
 }
 
 function person(params, oncomplite, onerror){
-    network.native(baseurl + 'collection/web/1?elementAlias='+params.url+'&elementType=PERSON&limit=60&offset=0&withInnerCollections=false&includeProductsForUpsale=false&filter=null',(json)=>{
+    network.silent(baseurl + 'collection/web/1?elementAlias='+params.url+'&elementType=PERSON&limit=60&offset=0&withInnerCollections=false&includeProductsForUpsale=false&filter=null',(json)=>{
         let data = {
             movie: {
                 results: []
@@ -263,7 +263,7 @@ function person(params, oncomplite, onerror){
 }
 
 function main(params, oncomplite, onerror){
-    network.native(baseurl + 'mainpage/web/1',(json)=>{
+    network.silent(baseurl + 'mainpage/web/1',(json)=>{
         let element  = json.element
         let fulldata = []
 
@@ -404,7 +404,7 @@ function category(params, oncomplite, onerror){
 function full(params, oncomplite, onerror){
     let data = {}
 
-    network.native(baseurl + 'moviecard/web/1?elementAlias='+params.url+'&elementType=MOVIE',(json)=>{
+    network.silent(baseurl + 'moviecard/web/1?elementAlias='+params.url+'&elementType=MOVIE',(json)=>{
         let element = json.element
 
         if(element){
