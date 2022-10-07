@@ -158,9 +158,11 @@ function seasonsDetails(element){
 function similar(element){
     let data = []
 
-    element.similar.items.forEach(elem => {
-        data.push(tocard(elem.element))
-    })
+    if(element.similar){
+        element.similar.items.forEach(elem => {
+            data.push(tocard(elem.element))
+        })
+    }
 
     return data.length ? {results: data} : false
 }
