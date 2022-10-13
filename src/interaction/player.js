@@ -65,6 +65,8 @@ function init(){
         Panel.update('timeend',Utils.secondsToTime(e.duration || 0))
         Panel.update('position', (e.current / e.duration * 100) + '%')
 
+        Screensaver.resetTimer()
+
         if(work && work.timeline && !work.timeline.waiting_for_user && e.duration){
             if(Storage.field('player_timecode') !== 'again' && !work.timeline.continued){
                 let prend = e.duration - 15,
@@ -100,14 +102,14 @@ function init(){
 
     /** Плей видео */
     Video.listener.follow('play',(e)=>{
-        Screensaver.disable()
+        //Screensaver.disable()
 
         Panel.update('play')
     })
 
     /** Пауза видео */
     Video.listener.follow('pause',(e)=>{
-        Screensaver.enable()
+        //Screensaver.enable()
 
         Panel.update('pause')
     })
@@ -265,6 +267,7 @@ function init(){
 
     /** Событие на переключение серии */
     Playlist.listener.follow('select',(e)=>{
+        console.log('select',e)
         let type = typeof e.item.url
         let call = ()=>{
             let params = Video.saveParams()
@@ -275,9 +278,13 @@ function init(){
 
             Video.setParams(params)
 
+            if(e.item.callback) e.item.callback()
+
             if(Torserver.ip() && e.item.url.indexOf(Torserver.ip()) > -1) Info.set('stat',e.item.url)
 
-            Panel.showNextEpisodeName({playlist: e.playlist, position: e.position})
+            Playlist.active()
+
+            Panel.showNextEpisodeName({playlist: Playlist.get(), position: Playlist.position()})
         }
 
         if(type == 'string') call()
@@ -419,7 +426,7 @@ function destroy(){
     viewing.difference = 0
     viewing.current    = 0
 
-    Screensaver.enable()
+    //Screensaver.enable()
 
     Video.destroy()
 
@@ -599,6 +606,8 @@ function play(data){
 
     let lauch = ()=>{
         preload(data, ()=>{
+            html.toggleClass('tv',data.tv ? true : false)
+
             listener.send('start',data)
 
             work = data

@@ -21,6 +21,8 @@ let tracks    = []
 let subs      = []
 let qualitys  = false
 let translates = {}
+let last_settings_action
+let last_panel_focus
 
 function init(){
     html = Template.get('player_panel')
@@ -151,6 +153,10 @@ function init(){
     })
 
     html.find('.player-panel__line:eq(1) .selector').attr('data-controller', 'player_panel')
+
+    html.find('.player-panel__left .selector,.player-panel__center .selector,.player-panel__right .selector').on('hover:focus',function(){
+        last_panel_focus = $(this)[0]
+    })
     
     /**
      * Выбор качества
@@ -314,6 +320,11 @@ function settings(){
 
     if(Storage.field('player_normalization')){
         items.push({
+            title: Lang.translate('player_normalization'),
+            separator: true
+        })
+
+        items.push({
             title: Lang.translate('player_normalization_power_title'),
             subtitle: Lang.translate('player_normalization_step_' + Storage.get('player_normalization_power','hight')),
             method: 'normalization_power'
@@ -326,10 +337,16 @@ function settings(){
         })
     }
 
+    if(last_settings_action){
+        items.find(a=>a.method == last_settings_action).selected = true
+    }
+
     Select.show({
         title: Lang.translate('title_settings'),
         items,
         onSelect: (a)=>{
+            last_settings_action = a.method
+
             if(a.method == 'size') selectSize()
             if(a.method == 'speed') selectSpeed()
             if(a.method == 'normalization_power') selectNormalizationStep('power','hight')
@@ -347,7 +364,7 @@ function settings(){
 }
 
 function selectNormalizationStep(type, def){
-    let select = Storage.get('player_normalization_'+type, def)
+    let select  = Storage.get('player_normalization_'+type, def)
 
     let items = [
         {
@@ -374,6 +391,8 @@ function selectNormalizationStep(type, def){
         onBack: settings,
         onSelect: (a)=>{
             Storage.set('player_normalization_'+type, a.value)
+
+            settings()
         }
     })
 }
@@ -525,9 +544,15 @@ function selectSpeed(){
             Storage.set('player_speed',a.value)
 
             listener.send('speed',{speed: a.value})
+
+            settings()
         },
         onBack: settings
     })
+}
+
+function isTV(){
+    return $('body > .player').hasClass('tv')
 }
 
 /**
@@ -564,10 +589,10 @@ function selectSpeed(){
     Controller.add('player_panel',{
         toggle: ()=>{
             Controller.collectionSet(render())
-            Controller.collectionFocus($('.player-panel__playpause',html)[0],render())
+            Controller.collectionFocus(last_panel_focus ? last_panel_focus : $(isTV() ? '.player-panel__next' : '.player-panel__playpause',html)[0],render())
         },
         up: ()=>{
-            toggleRewind()
+            isTV() ? Controller.toggle('player') : toggleRewind()
         },
         right: ()=>{
             Navigator.move('right')
@@ -664,7 +689,7 @@ function rewind(){
  * Переключить на контроллер перемотки
  */
 function toggleRewind(){
-    Controller.toggle('player_rewind')
+    Controller.toggle(isTV() ? 'player_panel' : 'player_rewind')
 }
 
 /**
@@ -798,6 +823,8 @@ function destroy(){
     subs      = []
     qualitys  = false
     translates = {}
+
+    last_panel_focus = false
 
     elems.peding.css({width: 0})
     elems.position.css({width: 0})

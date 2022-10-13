@@ -65,6 +65,8 @@ import TMDB from './utils/tmdb'
 import Base64 from './utils/base64'
 import Loading from './interaction/loading'
 import YouTube from './interaction/youtube'
+import WebOSLauncher from './utils/webos_launcher'
+import Event from './utils/event'
 
 
 window.Lampa = {
@@ -131,7 +133,9 @@ window.Lampa = {
     TMDB,
     Base64,
     Loading,
-    YouTube
+    YouTube,
+    WebOSLauncher,
+    Event
 }
 
 function prepareApp(){
@@ -209,6 +213,7 @@ function startApp(){
     Player.init()
     Iframe.init()
     Parser.init()
+    WebOSLauncher.init()
 
     /** Надо зачиcтить, не хорошо светить пароль ;) */
 

@@ -1,4 +1,5 @@
 let reqCallback = {}
+let timeCallback = {}
 
 function exit() {
     if(checkVersion(1)) AndroidJS.exit()
@@ -45,6 +46,11 @@ function openTorrent(SERVER){
 }
 
 function openPlayer(link, data){
+    if(checkVersion(98, true)){
+        if(data.timeline) {
+            timeCallback[data.timeline.hash] = data
+        }
+    }
     if(checkVersion(10)) AndroidJS.openPlayer(link, JSON.stringify(data))
     else $('<a href="'+link+'"><a/>')[0].click()
 }
@@ -82,20 +88,27 @@ function httpCall(index, callback){
     }
 }
 
+function timeCall(timeline){
+    let hash = timeline.hash
+    if(timeCallback[hash]){
+        timeCallback[hash].timeline.handler(timeline.percent, timeline.time, timeline.duration)
+        timeCallback[hash].timeline.percent = timeline.percent
+        timeCallback[hash].timeline.duration = timeline.duration
+        timeCallback[hash].timeline.time = timeline.time
+        delete timeCallback[hash]
+    }
+}
+
 function voiceStart(){
     if(checkVersion(25)) AndroidJS.voiceStart()
     else Lampa.Noty.show("Работает только на Android TV")
-}
-
-function showInput(inputText){
-    if(checkVersion(27)) AndroidJS.showInput(inputText)
 }
 
 function updateChannel(where){
     if(checkVersion(28)) AndroidJS.updateChannel(where)
 }
 
-function checkVersion(needVersion){
+function checkVersion(needVersion, silent=false){
     if(typeof AndroidJS !== 'undefined') {
         try {
             let current = AndroidJS.appVersion().split('-')
@@ -103,7 +116,8 @@ function checkVersion(needVersion){
             if (parseInt(versionCode, 10) >= needVersion) {
                 return true
             } else {
-                Lampa.Noty.show("Обновите приложение.<br>Требуется версия: " + needVersion + "<br>Текущая версия: " + versionCode)
+                if(!silent)
+                    Lampa.Noty.show("Обновите приложение.<br>Требуется версия: " + needVersion + "<br>Текущая версия: " + versionCode)
                 return false
             }
         } catch (e) {
@@ -123,6 +137,6 @@ export default {
     httpReq,
     voiceStart,
     httpCall,
-    showInput,
+    timeCall,
     updateChannel
 }
